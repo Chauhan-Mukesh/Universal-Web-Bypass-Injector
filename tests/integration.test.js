@@ -271,12 +271,22 @@ describe('Extension Integration Tests', () => {
       ]
 
       restrictedUrls.forEach(url => {
-        global.window.location.protocol = new URL(url).protocol
-        global.window.location.href = url
+        const parsedUrl = new URL(url)
+        
+        // Mock window.location without triggering navigation
+        Object.defineProperty(global.window, 'location', {
+          value: {
+            protocol: parsedUrl.protocol,
+            href: url,
+            host: parsedUrl.host
+          },
+          writable: true,
+          configurable: true
+        })
 
         // Content script should not initialize on restricted pages
         const shouldRun = !['chrome:', 'about:', 'moz-extension:'].includes(
-          global.window.location.protocol
+          parsedUrl.protocol
         )
         expect(shouldRun).toBe(false)
       })

@@ -12,7 +12,7 @@ global.chrome = {
       addListener: jest.fn()
     },
     getManifest: jest.fn(() => ({
-      version: '1.0.0'
+      version: '2.0.0'
     }))
   },
   action: {
@@ -27,10 +27,19 @@ global.chrome = {
     }
   },
   scripting: {
-    executeScript: jest.fn()
+    executeScript: jest.fn(() => Promise.resolve())
   },
   tabs: {
-    query: jest.fn(),
+    query: jest.fn(() => Promise.resolve([])),
+    create: jest.fn(() => Promise.resolve({})),
+    onUpdated: {
+      addListener: jest.fn()
+    },
+    onRemoved: {
+      addListener: jest.fn()
+    }
+  },
+  notifications: {
     create: jest.fn()
   }
 }
