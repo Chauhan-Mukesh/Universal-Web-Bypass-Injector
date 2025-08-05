@@ -330,6 +330,18 @@
     cleanupTimeout: null,
 
     /**
+     * Last mutation observer execution time for throttling.
+     * @type {number}
+     */
+    lastMutationTime: 0,
+
+    /**
+     * Mutation observer throttle interval (ms).
+     * @type {number}
+     */
+    mutationThrottleInterval: 200,
+
+    /**
      * Element logging per site for diagnostics.
      * @type {Array<Object>}
      */
@@ -874,15 +886,223 @@
       try {
         const scope = nodes ? Array.from(nodes) : [document.documentElement]
         const isProtected = this._isProtectedSite()
-        let removedCount = 0
-
+        
         if (!scope.length) return
 
-        // Be more conservative on protected sites
-        if (isProtected) {
-          this._log('Protected site detected, using conservative cleaning')
-          // Only remove obvious ad/paywall elements on protected sites
-          const conservativeSelectors = [
+        // Use performance-optimized cleaning for large DOMs
+        if (scope.length === 1 && scope[0] === document.documentElement) {
+          this._cleanDOMOptimized(isProtected)
+        } else {
+          this._cleanDOMNodes(scope, isProtected)
+        }
+      } catch (error) {
+        this._logError('cleanDOM', error)
+      }
+    },
+
+    /**
+     * Performance-optimized DOM cleaning for large documents
+     * @param {boolean} isProtected - Whether the site is protected
+     * @private
+     */
+    _cleanDOMOptimized(isProtected) {
+      const startTime = performance.now()
+      let removedCount = 0
+      const nodeCount = document.querySelectorAll('*').length
+      
+      try {
+        // Performance budget check for very large DOMs
+        if (nodeCount > 10000) {
+          this._log(`Warning: Large DOM detected (${nodeCount} nodes). Using minimal cleaning for performance.`)
+          removedCount += this._cleanDOMMinimal()
+        } else if (isProtected) {
+          // Ultra-conservative cleaning for protected sites
+          const elements = document.querySelectorAll('.adblock-overlay, .paywall-overlay, [data-ad-container]')
+          for (let i = 0; i < elements.length; i++) {
+            const element = elements[i]
+            if (element && element.parentNode && this._isLikelyAd(element) && this._removeElement(element)) {
+              removedCount++
+            }
+          }
+        } else {
+          // Fast DOM cleaning with minimal queries
+          removedCount += this._fastCleanDOM()
+        }
+
+        // Minimal final cleanup - only critical operations
+        if (!isProtected) {
+          this._removeAdblockDialogs()
+        }
+        
+        const endTime = performance.now()
+        const duration = Math.round(endTime - startTime)
+        
+        // Performance monitoring and reporting
+        if (duration > 1000) {
+          this._logError('Performance Budget Exceeded', new Error(`DOM size: ${nodeCount} nodes — processing time: ${duration} ms (budget: 1000 ms)`))
+        }
+        
+        if (removedCount > 0) {
+          this._log(`Cleaned ${removedCount} elements from DOM (${nodeCount} nodes) in ${duration}ms`)
+        }
+      } catch (error) {
+        const endTime = performance.now()
+        const duration = Math.round(endTime - startTime)
+        this._logError('cleanDOMOptimized', error)
+        this._log(`DOM cleaning failed after ${duration}ms for ${nodeCount} nodes`)
+      }
+    },
+
+    /**
+     * Ultra-fast DOM cleaning with minimal operations
+     * @returns {number} Number of elements removed
+     * @private
+     */
+    _fastCleanDOM() {
+      let removedCount = 0
+      
+      try {
+        // Single query with most common patterns only
+        const commonAds = document.querySelectorAll('.adblock-overlay, .paywall-overlay, .paywall-modal, .subscription-overlay, [data-ad-container], [data-ad-unit]')
+        
+        // Batch collect elements to remove
+        const toRemove = []
+        
+        for (let i = 0; i < commonAds.length; i++) {
+          const element = commonAds[i]
+          if (element && element.parentNode) {
+            toRemove.push(element)
+          }
+        }
+        
+        // Batch remove elements
+        for (const element of toRemove) {
+          if (element.parentNode) {
+            element.parentNode.removeChild(element)
+            removedCount++
+            this._logBlockedElement('ad-element', element, 'fast-cleanup')
+          }
+        }
+        
+        // Quick check for blocked scripts/iframes with simple domain matching
+        const scripts = document.querySelectorAll('script[src*="doubleclick"], script[src*="googlesyndication"], iframe[src*="doubleclick"], iframe[src*="googlesyndication"]')
+        for (let i = 0; i < scripts.length; i++) {
+          const element = scripts[i]
+          if (element && element.parentNode) {
+            element.parentNode.removeChild(element)
+            removedCount++
+            this._logBlockedElement('blocked-src', element, 'fast-cleanup')
+          }
+        }
+        
+      } catch (error) {
+        this._logError('fastCleanDOM', error)
+      }
+      
+      return removedCount
+    },
+
+    /**
+     * Use TreeWalker for efficient DOM traversal and cleaning
+     * @returns {number} Number of elements removed
+     * @private
+     */
+    _cleanDOMWithTreeWalker() {
+      let removedCount = 0
+      
+      try {
+        const elementsToRemove = []
+        
+        // More efficient element collection using querySelectorAll with optimized selectors
+        const quickSelectors = [
+          // High-priority obvious ad/paywall elements
+          '.adblock-overlay, .disable-adblock, .paywall-overlay, .paywall-modal',
+          '.subscription-overlay, .premium-wall, [data-ad-container], [data-ad-unit]',
+          // Common ad elements
+          '.advertisement, .ad-banner, .adsystem',
+          // High z-index overlays that are likely modals
+          '[style*="z-index: 999"], [style*="z-index:999"]'
+        ]
+        
+        // Fast regex patterns for common blocked domains
+        const blockedDomainPattern = /(doubleclick|googlesyndication|googletagmanager|facebook\.net|google-analytics)/
+        
+        // Collect elements to remove using targeted queries
+        for (const selector of quickSelectors) {
+          try {
+            const elements = document.querySelectorAll(selector)
+            for (let i = 0; i < elements.length; i++) {
+              const element = elements[i]
+              if (element && element.parentNode) {
+                elementsToRemove.push(element)
+              }
+            }
+          } catch (_error) {
+            // Skip invalid selectors
+          }
+        }
+        
+        // Quick scan for elements with blocked src attributes (most common case)
+        const srcElements = document.querySelectorAll('script[src], iframe[src]')
+        for (let i = 0; i < srcElements.length; i++) {
+          const element = srcElements[i]
+          const src = element.src
+          if (src && blockedDomainPattern.test(src)) {
+            elementsToRemove.push(element)
+          }
+        }
+        
+        // Remove duplicates and batch remove
+        const uniqueElements = [...new Set(elementsToRemove)]
+        for (const element of uniqueElements) {
+          if (element.parentNode && this._removeElement(element)) {
+            removedCount++
+          }
+        }
+        
+      } catch (error) {
+        this._logError('cleanDOMWithTreeWalker', error)
+        // Fallback to even simpler method
+        removedCount += this._cleanDOMMinimal()
+      }
+      
+      return removedCount
+    },
+
+    /**
+     * Minimal DOM cleaning method for maximum performance
+     * @returns {number} Number of elements removed
+     * @private
+     */
+    _cleanDOMMinimal() {
+      let removedCount = 0
+      
+      try {
+        // Only target the most obvious and common elements
+        const elements = document.querySelectorAll('.adblock-overlay, .paywall-overlay, .paywall-modal, [data-ad-container]')
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i]
+          if (element && element.parentNode && this._removeElement(element)) {
+            removedCount++
+          }
+        }
+      } catch (error) {
+        this._logError('cleanDOMMinimal', error)
+      }
+      
+      return removedCount
+    },
+
+    /**
+     * Get selector groups for batched processing
+     * @param {boolean} isProtected - Whether the site is protected
+     * @returns {Array} Array of selector group objects
+     * @private
+     */
+    _getSelectorGroups(isProtected) {
+      if (isProtected) {
+        return [{
+          selectors: [
             '.adblock-overlay',
             '.disable-adblock',
             '.paywall-overlay',
@@ -892,44 +1112,98 @@
             '[data-ad-unit]',
             'iframe[src*="doubleclick"]',
             'iframe[src*="googlesyndication"]'
-          ].join(', ')
+          ].join(', '),
+          validator: (element) => this._isLikelyAd(element)
+        }]
+      }
 
-          scope.forEach(node => {
-            if (!node || !node.nodeType) return
-            try {
-              if (node.querySelectorAll) {
-                const elementsToRemove = node.querySelectorAll(conservativeSelectors)
-                elementsToRemove.forEach(element => {
-                  // Additional validation for protected sites
-                  if (this._isLikelyAd(element) && this._removeElement(element)) {
-                    removedCount++
-                  }
-                })
-              }
-            } catch (error) {
-              this._logError('cleanDOM conservative mode', error)
+      // Break large selector list into smaller, more efficient groups
+      const allSelectors = this.config.SELECTORS_TO_REMOVE
+      const selectorGroups = []
+      const groupSize = 6 // Smaller groups for better performance
+      
+      for (let i = 0; i < allSelectors.length; i += groupSize) {
+        const group = allSelectors.slice(i, i + groupSize)
+        selectorGroups.push({
+          selectors: group.join(', '),
+          validator: null
+        })
+      }
+      
+      // Add src-based selectors as a separate group
+      selectorGroups.push({
+        selectors: 'script[src], iframe[src], img[src], embed[src], object[data]',
+        validator: (element) => {
+          const src = element.src || element.data
+          return src && this._isBlocked(src)
+        }
+      })
+      
+      return selectorGroups
+    },
+
+    /**
+     * Traditional DOM cleaning for specific node sets
+     * @param {Array} scope - Nodes to clean
+     * @param {boolean} isProtected - Whether the site is protected
+     * @private
+     */
+    _cleanDOMNodes(scope, isProtected) {
+      let removedCount = 0
+
+      // Be more conservative on protected sites
+      if (isProtected) {
+        this._log('Protected site detected, using conservative cleaning')
+        const conservativeSelectors = [
+          '.adblock-overlay',
+          '.disable-adblock',
+          '.paywall-overlay',
+          '.paywall-modal',
+          '.subscription-overlay',
+          '[data-ad-container]',
+          '[data-ad-unit]',
+          'iframe[src*="doubleclick"]',
+          'iframe[src*="googlesyndication"]'
+        ].join(', ')
+
+        scope.forEach(node => {
+          if (!node || !node.nodeType) return
+          try {
+            if (node.querySelectorAll) {
+              const elementsToRemove = node.querySelectorAll(conservativeSelectors)
+              elementsToRemove.forEach(element => {
+                if (this._isLikelyAd(element) && this._removeElement(element)) {
+                  removedCount++
+                }
+              })
             }
-          })
-        } else {
-          // Normal cleaning for other sites
-          const selectors = this.config.SELECTORS_TO_REMOVE.join(', ')
-
+          } catch (error) {
+            this._logError('cleanDOM conservative mode', error)
+          }
+        })
+      } else {
+        // Normal cleaning for other sites - use chunked selectors
+        const selectorGroups = this._getSelectorGroups(false)
+        
+        selectorGroups.forEach(group => {
           scope.forEach(node => {
             if (!node || !node.nodeType) return
 
             try {
-              // Check if the node itself is an element and matches
-              if (node.matches && node.matches(selectors)) {
-                if (this._removeElement(node)) {
+              // Check if the node itself matches
+              if (node.matches && node.matches(group.selectors)) {
+                const isValid = group.validator ? group.validator(node) : true
+                if (isValid && this._removeElement(node)) {
                   removedCount++
                 }
               }
 
               // Query for children matching the selectors
               if (node.querySelectorAll) {
-                const elementsToRemove = node.querySelectorAll(selectors)
+                const elementsToRemove = node.querySelectorAll(group.selectors)
                 elementsToRemove.forEach(element => {
-                  if (this._removeElement(element)) {
+                  const isValid = group.validator ? group.validator(element) : true
+                  if (isValid && this._removeElement(element)) {
                     removedCount++
                   }
                 })
@@ -938,57 +1212,18 @@
               this._logError('cleanDOM selector matching', error)
             }
           })
-        }
-
-        // Remove elements with src attributes pointing to blocked hosts
-        const srcSelectors = 'script[src], iframe[src], img[src], embed[src], object[data]'
-
-        scope.forEach(node => {
-          if (!node || !node.nodeType) return
-
-          try {
-            // Check node itself
-            if (node.matches && node.matches(srcSelectors)) {
-              const src = node.src || node.data
-              if (src && this._isBlocked(src)) {
-                this._log(`Removed element with blocked src: ${node.tagName} -> ${src}`)
-                if (this._removeElement(node)) {
-                  removedCount++
-                }
-              }
-            }
-
-            // Check children
-            if (node.querySelectorAll) {
-              const srcElements = node.querySelectorAll(srcSelectors)
-              srcElements.forEach(element => {
-                const src = element.src || element.data
-                if (src && this._isBlocked(src)) {
-                  this._log(`Removed element with blocked src: ${element.tagName} -> ${src}`)
-                  if (this._removeElement(element)) {
-                    removedCount++
-                  }
-                }
-              })
-            }
-          } catch (error) {
-            this._logError('cleanDOM src checking', error)
-          }
         })
+      }
 
-        // Remove high z-index overlays (likely modals/paywalls) - skip for protected sites
-        if (!isProtected) {
-          this._removeHighZIndexOverlays(scope)
-          // Enhanced anti-adblock circumvention
-          this._removeAdblockDialogs()
-          this._removeBlurOverlays()
-        }
+      // Remove high z-index overlays (likely modals/paywalls) - skip for protected sites
+      if (!isProtected) {
+        this._removeHighZIndexOverlays(scope)
+        this._removeAdblockDialogs()
+        this._removeBlurOverlays()
+      }
 
-        if (removedCount > 0) {
-          this._log(`Cleaned ${removedCount} elements from DOM`)
-        }
-      } catch (error) {
-        this._logError('cleanDOM', error)
+      if (removedCount > 0) {
+        this._log(`Cleaned ${removedCount} elements from DOM`)
       }
     },
 
@@ -1421,10 +1656,28 @@
 
         this.observer = new MutationObserver((mutations) => {
           try {
+            const now = Date.now()
+            
+            // Throttle mutations for performance on rapidly changing pages
+            if (now - this.lastMutationTime < this.mutationThrottleInterval) {
+              return
+            }
+            
+            this.lastMutationTime = now
+            
             let shouldClean = false
             const addedNodes = []
+            let mutationCount = 0
 
             for (const mutation of mutations) {
+              mutationCount++
+              
+              // Limit processing for very large mutation sets
+              if (mutationCount > 50) {
+                this._log('Large mutation set detected, limiting processing for performance')
+                break
+              }
+              
               if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                 mutation.addedNodes.forEach(node => {
                   if (node.nodeType === Node.ELEMENT_NODE) {

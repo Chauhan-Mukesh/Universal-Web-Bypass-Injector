@@ -280,21 +280,61 @@ describe('Enhanced Anti-Adblock and Restricted Content Features', () => {
 
   describe('Performance Tests', () => {
     test('should handle large DOM efficiently', () => {
-      // Create a large DOM
+      // Create a large DOM with 5000+ nodes to simulate real-world scenarios
       const container = document.createElement('div');
-      for (let i = 0; i < 1000; i++) {
+      const nodeCount = 5000;
+      
+      for (let i = 0; i < nodeCount; i++) {
         const element = document.createElement('div');
-        element.className = i % 10 === 0 ? 'ad-container' : 'regular-content';
+        
+        // Add various element types and classes that would be processed
+        if (i % 50 === 0) {
+          element.className = 'adblock-overlay';
+        } else if (i % 40 === 0) {
+          element.className = 'paywall-modal';
+        } else if (i % 30 === 0) {
+          element.className = 'ad-container';
+          element.setAttribute('data-ad-unit', 'true');
+        } else if (i % 20 === 0) {
+          element.className = 'subscription-overlay';
+        } else if (i % 15 === 0) {
+          // Create iframe elements that would be checked for blocked hosts
+          const iframe = document.createElement('iframe');
+          iframe.src = 'https://doubleclick.net/ad';
+          element.appendChild(iframe);
+        } else if (i % 10 === 0) {
+          // Add script elements with src attributes
+          const script = document.createElement('script');
+          script.src = 'https://googlesyndication.com/ad.js';
+          element.appendChild(script);
+        } else {
+          element.className = 'regular-content';
+        }
+        
+        // Add nested elements to increase complexity
+        if (i % 100 === 0) {
+          for (let j = 0; j < 10; j++) {
+            const nested = document.createElement('span');
+            nested.className = j % 3 === 0 ? 'nested-ad' : 'nested-content';
+            element.appendChild(nested);
+          }
+        }
+        
         container.appendChild(element);
       }
       document.body.appendChild(container);
 
-      const startTime = Date.now();
+      console.log(`Created DOM with ${nodeCount} nodes for performance testing`);
+      
+      const startTime = performance.now();
       UniversalBypass.cleanDOM();
-      const endTime = Date.now();
+      const endTime = performance.now();
+      
+      const duration = Math.round(endTime - startTime);
+      console.log(`DOM cleaning took ${duration}ms for ${nodeCount} nodes`);
 
       // Should complete within reasonable time (less than 1 second)
-      expect(endTime - startTime).toBeLessThan(1000);
+      expect(duration).toBeLessThan(1000);
     });
   });
 });
