@@ -50,3 +50,19 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+
+# CI/CD artifacts
+packages/
+security-report.json
+eslint-report.json
+build-report.json
+*.report.json
+*.manifest.json
+*.checksums.txt
+
+# Build artifacts
+dist/
+build/
+
+# Temporary CI files
+.github-actions-*/

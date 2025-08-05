@@ -1,0 +1,325 @@
+name: 🚀 Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+# 🛡️ Security: Restrict permissions
+permissions:
+  contents: write
+  discussions: write
+  packages: write
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # 🔍 Validate Release
+  validate:
+    name: 🔍 Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+            IS_PRERELEASE="false"
+            if [[ "$VERSION" =~ -(alpha|beta|rc) ]]; then
+              IS_PRERELEASE="true"
+            fi
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "🏷️ Version: $VERSION (prerelease: $IS_PRERELEASE)"
+
+      - name: ✅ Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-alpha.1"
+            exit 1
+          fi
+          echo "✅ Version format is valid"
+
+  # 🧪 Pre-release Testing
+  test:
+    name: 🧪 Release Testing
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔍 Run linting
+        run: npm run lint
+
+      - name: 🧪 Run tests with coverage
+        run: npm run test:coverage
+
+      - name: 🏗️ Test build
+        run: npm run build
+
+  # 🏗️ Build Release
+  build:
+    name: 🏗️ Build Release
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    timeout-minutes: 15
+    outputs:
+      package_name: ${{ steps.package.outputs.package_name }}
+      package_path: ${{ steps.package.outputs.package_path }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📝 Update version in manifest
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          VERSION_NUMBER="${VERSION#v}"
+          
+          # Update manifest.json version
+          jq --arg version "$VERSION_NUMBER" '.version = $version' manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
+          
+          # Update package.json version
+          npm version "$VERSION_NUMBER" --no-git-tag-version
+          
+          echo "📝 Updated version to $VERSION_NUMBER"
+
+      - name: 🏗️ Build extension
+        run: |
+          echo "🔨 Building release version..."
+          npm run build
+          
+          # Create distribution directory
+          mkdir -p dist
+          
+          # Copy extension files
+          cp manifest.json dist/
+          cp *.js dist/
+          cp *.html dist/
+          cp *.png dist/
+          
+          # Copy icons if they exist
+          if [ -d "icons" ]; then
+            cp -r icons dist/
+          fi
+          
+          # Create release notes file
+          echo "# Universal Web Bypass Injector ${{ needs.validate.outputs.version }}" > dist/RELEASE_NOTES.md
+          echo "" >> dist/RELEASE_NOTES.md
+          echo "🚀 Release build created on $(date)" >> dist/RELEASE_NOTES.md
+          
+          echo "✅ Build completed successfully"
+
+      - name: 📦 Create release package
+        id: package
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          PACKAGE_NAME="universal-web-bypass-injector-$VERSION"
+          PACKAGE_PATH="$PACKAGE_NAME.zip"
+          
+          cd dist
+          zip -r "../$PACKAGE_PATH" .
+          cd ..
+          
+          # Create source archive
+          git archive --format=zip --prefix="$PACKAGE_NAME-source/" HEAD > "$PACKAGE_NAME-source.zip"
+          
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "package_path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          
+          echo "📦 Packages created:"
+          ls -la *.zip
+
+      - name: 🔐 Generate checksums
+        run: |
+          echo "🔐 Generating checksums..."
+          sha256sum *.zip > checksums.txt
+          cat checksums.txt
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages-${{ needs.validate.outputs.version }}
+          path: |
+            *.zip
+            checksums.txt
+            dist/
+          retention-days: 90
+
+  # 📋 Generate Changelog
+  changelog:
+    name: 📋 Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 5
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📋 Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "📋 Generating changelog from $PREVIOUS_TAG to $VERSION"
+            
+            # Generate changelog using git log
+            CHANGELOG="## 🚀 What's Changed in $VERSION\n\n"
+            
+            # Get commits between tags
+            COMMITS=$(git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..$VERSION 2>/dev/null || git log --pretty=format:"- %s (%an)" $VERSION)
+            
+            if [ -n "$COMMITS" ]; then
+              CHANGELOG="$CHANGELOG$COMMITS\n\n"
+            fi
+            
+            # Add comparison link if we have a previous tag
+            if [ -n "$PREVIOUS_TAG" ]; then
+              CHANGELOG="$CHANGELOG**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$VERSION\n"
+            fi
+          else
+            echo "📋 No previous tag found, generating initial changelog"
+            CHANGELOG="## 🚀 Initial Release $VERSION\n\n"
+            CHANGELOG="$CHANGELOG🎉 First release of Universal Web Bypass Injector!\n\n"
+            CHANGELOG="$CHANGELOG### ✨ Features\n"
+            CHANGELOG="$CHANGELOG- Universal ad-blocker and paywall bypass\n"
+            CHANGELOG="$CHANGELOG- Advanced tracking script removal\n"
+            CHANGELOG="$CHANGELOG- Comprehensive overlay removal\n"
+            CHANGELOG="$CHANGELOG- Chrome Extension Manifest V3 support\n\n"
+          fi
+          
+          # Save changelog to file for release
+          echo -e "$CHANGELOG" > CHANGELOG.md
+          
+          # Output for GitHub release (escape newlines)
+          CHANGELOG_ESCAPED=$(echo -e "$CHANGELOG" | sed ':a;N;$!ba;s/\n/\\n/g')
+          echo "changelog=$CHANGELOG_ESCAPED" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-${{ needs.validate.outputs.version }}
+          path: CHANGELOG.md
+          retention-days: 30
+
+  # 🚀 Create Release
+  release:
+    name: 🚀 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, changelog]
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages-${{ needs.validate.outputs.version }}
+          path: ./artifacts
+
+      - name: 📥 Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog-${{ needs.validate.outputs.version }}
+          path: ./changelog
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Universal Web Bypass Injector ${{ needs.validate.outputs.version }}
+          body_path: ./changelog/CHANGELOG.md
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          draft: false
+          files: |
+            ./artifacts/*.zip
+            ./artifacts/checksums.txt
+          discussion_category_name: 'Releases'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 📊 Post-release
+  post-release:
+    name: 📊 Post-release Tasks
+    runs-on: ubuntu-latest
+    needs: [validate, release]
+    if: success()
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🎉 Success notification
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          echo "🎉 Successfully released $VERSION!"
+          echo "📦 Release available at: https://github.com/${{ github.repository }}/releases/tag/$VERSION"
+
+      - name: 📊 Update release metrics
+        run: |
+          echo "📊 Release metrics:"
+          echo "- Version: ${{ needs.validate.outputs.version }}"
+          echo "- Prerelease: ${{ needs.validate.outputs.is_prerelease }}"
+          echo "- Repository: ${{ github.repository }}"
+          echo "- Released by: ${{ github.actor }}"
+          echo "- Release date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"

@@ -1,0 +1,392 @@
+name: 🔒 Security Scanning
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+# 🛡️ Security: Restrict permissions
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: write
+
+# 🚫 Prevent concurrent runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # 🔍 Dependency Scanning
+  dependency-scan:
+    name: 🔍 Dependency Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🛡️ Run npm audit
+        id: npm-audit
+        run: |
+          echo "🔍 Running npm security audit..."
+          
+          # Run audit and capture output
+          npm audit --audit-level moderate --json > audit-results.json || true
+          
+          # Check if there are any vulnerabilities
+          VULNS=$(jq '.metadata.vulnerabilities.total' audit-results.json 2>/dev/null || echo "0")
+          
+          echo "vulnerabilities=$VULNS" >> $GITHUB_OUTPUT
+          
+          if [ "$VULNS" -gt 0 ]; then
+            echo "⚠️ Found $VULNS vulnerabilities"
+            npm audit --audit-level moderate
+          else
+            echo "✅ No vulnerabilities found"
+          fi
+
+      - name: 📊 Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results-${{ github.run_id }}
+          path: audit-results.json
+          retention-days: 30
+
+      - name: 🔍 Run Snyk security scan
+        continue-on-error: true
+        run: |
+          echo "🔍 Running Snyk security scan..."
+          
+          # Install Snyk if available
+          if npm list -g snyk >/dev/null 2>&1 || npm install -g snyk; then
+            echo "Running Snyk scan..."
+            snyk test --json > snyk-results.json || true
+            
+            if [ -f snyk-results.json ]; then
+              echo "📊 Snyk scan completed"
+              cat snyk-results.json | jq -r '.vulnerabilities[].title' | head -10 || true
+            fi
+          else
+            echo "⚠️ Snyk not available, skipping scan"
+          fi
+
+  # 🔎 Code Scanning (CodeQL)
+  codeql:
+    name: 🔎 CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-and-quality
+
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: 🔎 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # 🕵️ Secret Scanning
+  secret-scan:
+    name: 🕵️ Secret Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🕵️ Run TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: 🔍 Custom secret patterns scan
+        run: |
+          echo "🔍 Scanning for common secret patterns..."
+          
+          # Define patterns to search for
+          PATTERNS=(
+            "(?i)(api_key|apikey|api-key)\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+            "(?i)(secret|password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{4,}['\"]"
+            "(?i)(token)\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+            "(?i)(key)\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+            "-----BEGIN [A-Z ]+-----"
+            "(?i)chrome-extension://[a-z0-9]{32}"
+          )
+          
+          echo "🔍 Searching for potential secrets..."
+          FOUND_SECRETS=false
+          
+          for pattern in "${PATTERNS[@]}"; do
+            if grep -rE "$pattern" . --exclude-dir=".git" --exclude-dir="node_modules" --exclude="*.log" >/dev/null 2>&1; then
+              echo "⚠️ Potential secret pattern found: $pattern"
+              FOUND_SECRETS=true
+            fi
+          done
+          
+          if [ "$FOUND_SECRETS" = "false" ]; then
+            echo "✅ No suspicious secret patterns found"
+          else
+            echo "❌ Potential secrets detected. Please review the codebase."
+            exit 1
+          fi
+
+  # 🔐 License Scanning
+  license-scan:
+    name: 🔐 License Compliance Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔐 Check licenses
+        run: |
+          echo "🔐 Checking license compliance..."
+          
+          # Install license-checker if not present
+          if ! command -v license-checker &> /dev/null; then
+            npm install -g license-checker
+          fi
+          
+          # Run license check
+          license-checker --summary > license-summary.txt
+          license-checker --json > license-details.json
+          
+          echo "📊 License summary:"
+          cat license-summary.txt
+          
+          # Check for prohibited licenses
+          PROHIBITED_LICENSES=("GPL-2.0" "AGPL-3.0" "LGPL-2.1")
+          
+          echo "🔍 Checking for prohibited licenses..."
+          VIOLATIONS_FOUND=false
+          
+          for license in "${PROHIBITED_LICENSES[@]}"; do
+            if grep -q "$license" license-details.json; then
+              echo "❌ Prohibited license found: $license"
+              VIOLATIONS_FOUND=true
+            fi
+          done
+          
+          if [ "$VIOLATIONS_FOUND" = "false" ]; then
+            echo "✅ No license violations found"
+          else
+            echo "⚠️ License violations detected. Please review dependencies."
+          fi
+
+      - name: 📤 Upload license reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports-${{ github.run_id }}
+          path: |
+            license-summary.txt
+            license-details.json
+          retention-days: 30
+
+  # 🔒 Security Policy Check
+  security-policy:
+    name: 🔒 Security Policy Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔒 Check security files
+        run: |
+          echo "🔒 Checking for security policy files..."
+          
+          SECURITY_FILES=(
+            "SECURITY.md"
+            ".github/SECURITY.md"
+            "docs/SECURITY.md"
+            "security.txt"
+            ".well-known/security.txt"
+          )
+          
+          FOUND_POLICY=false
+          
+          for file in "${SECURITY_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found security policy: $file"
+              FOUND_POLICY=true
+              break
+            fi
+          done
+          
+          if [ "$FOUND_POLICY" = "false" ]; then
+            echo "⚠️ No security policy found"
+            echo "📝 Consider adding a SECURITY.md file"
+          fi
+
+      - name: 🔍 Validate manifest security
+        run: |
+          echo "🔍 Validating Chrome extension security..."
+          
+          if [ -f "manifest.json" ]; then
+            echo "📋 Checking manifest.json security settings..."
+            
+            # Check for content security policy
+            if jq -e '.content_security_policy' manifest.json >/dev/null; then
+              echo "✅ Content Security Policy defined"
+            else
+              echo "⚠️ No Content Security Policy found"
+            fi
+            
+            # Check for excessive permissions
+            PERMISSIONS=$(jq -r '.permissions[]?' manifest.json 2>/dev/null | tr '\n' ' ')
+            echo "🔍 Permissions: $PERMISSIONS"
+            
+            # Flag potentially dangerous permissions
+            DANGEROUS_PERMS=("tabs" "history" "bookmarks" "<all_urls>" "webRequest" "webRequestBlocking")
+            
+            for perm in "${DANGEROUS_PERMS[@]}"; do
+              if echo "$PERMISSIONS" | grep -q "$perm"; then
+                echo "⚠️ Potentially sensitive permission: $perm"
+              fi
+            done
+            
+            echo "✅ Manifest security check completed"
+          else
+            echo "❌ manifest.json not found"
+          fi
+
+  # 📊 Security Report
+  security-report:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, codeql, secret-scan, license-scan, security-policy]
+    if: always()
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📊 Generate security summary
+        run: |
+          echo "📊 Security Scan Summary"
+          echo "========================"
+          echo ""
+          echo "🔍 Dependency Scan: ${{ needs.dependency-scan.result }}"
+          echo "🔎 CodeQL Analysis: ${{ needs.codeql.result }}"
+          echo "🕵️ Secret Scan: ${{ needs.secret-scan.result }}"
+          echo "🔐 License Scan: ${{ needs.license-scan.result }}"
+          echo "🔒 Security Policy: ${{ needs.security-policy.result }}"
+          echo ""
+          
+          # Count failures
+          FAILURES=0
+          if [ "${{ needs.dependency-scan.result }}" = "failure" ]; then ((FAILURES++)); fi
+          if [ "${{ needs.codeql.result }}" = "failure" ]; then ((FAILURES++)); fi
+          if [ "${{ needs.secret-scan.result }}" = "failure" ]; then ((FAILURES++)); fi
+          if [ "${{ needs.license-scan.result }}" = "failure" ]; then ((FAILURES++)); fi
+          if [ "${{ needs.security-policy.result }}" = "failure" ]; then ((FAILURES++)); fi
+          
+          if [ $FAILURES -eq 0 ]; then
+            echo "🎉 All security scans passed!"
+            echo "✅ Repository appears to be secure"
+          else
+            echo "⚠️ $FAILURES security scan(s) failed"
+            echo "🔍 Please review the failed scans above"
+          fi
+
+      - name: 📝 Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              dependency: '${{ needs.dependency-scan.result }}',
+              codeql: '${{ needs.codeql.result }}',
+              secrets: '${{ needs.secret-scan.result }}',
+              license: '${{ needs.license-scan.result }}',
+              policy: '${{ needs.security-policy.result }}'
+            };
+            
+            const statusEmoji = (status) => {
+              switch(status) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'skipped': return '⏭️';
+                default: return '⚠️';
+              }
+            };
+            
+            const body = `## 🔒 Security Scan Results
+            
+            | Scan Type | Status | Result |
+            |-----------|--------|--------|
+            | 🔍 Dependencies | ${statusEmoji(results.dependency)} | ${results.dependency} |
+            | 🔎 CodeQL | ${statusEmoji(results.codeql)} | ${results.codeql} |
+            | 🕵️ Secrets | ${statusEmoji(results.secrets)} | ${results.secrets} |
+            | 🔐 Licenses | ${statusEmoji(results.license)} | ${results.license} |
+            | 🔒 Policy | ${statusEmoji(results.policy)} | ${results.policy} |
+            
+            ${Object.values(results).every(r => r === 'success') ? 
+              '🎉 **All security scans passed!** This PR is secure.' : 
+              '⚠️ **Some security scans need attention.** Please review the failed scans.'}
+            
+            ---
+            *🛡️ Automated security report*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
