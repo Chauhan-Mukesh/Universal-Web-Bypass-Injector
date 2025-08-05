@@ -619,4 +619,159 @@ describe('UniversalBypass Content Script - Additional Coverage', () => {
       expect(isBlocked).toBe(true)
     })
   })
+
+  describe('Protected Sites Functionality', () => {
+    test('should identify protected sites correctly', () => {
+      // Mock the _isProtectedSite method to test different hostnames
+      const originalIsProtectedSite = UniversalBypass._isProtectedSite
+      
+      // Test protected site
+      UniversalBypass._isProtectedSite = jest.fn(() => true)
+      expect(UniversalBypass._isProtectedSite()).toBe(true)
+      
+      // Test non-protected site
+      UniversalBypass._isProtectedSite = jest.fn(() => false)
+      expect(UniversalBypass._isProtectedSite()).toBe(false)
+      
+      // Restore original method
+      UniversalBypass._isProtectedSite = originalIsProtectedSite
+    })
+
+    test('should skip network patching on protected sites', () => {
+      // Mock protected site
+      jest.spyOn(UniversalBypass, '_isProtectedSite').mockReturnValue(true)
+      global.window.fetch = jest.fn()
+      global.window.fetch._bypassed = false
+
+      const logSpy = jest.spyOn(UniversalBypass, '_log')
+      UniversalBypass.patchNetworkRequests()
+
+      expect(logSpy).toHaveBeenCalledWith('Protected site detected, network patching disabled')
+      expect(global.window.fetch._bypassed).toBe(false)
+
+      logSpy.mockRestore()
+      UniversalBypass._isProtectedSite.mockRestore()
+    })
+
+    test('should skip console suppression on protected sites', () => {
+      // Mock protected site
+      jest.spyOn(UniversalBypass, '_isProtectedSite').mockReturnValue(true)
+      const originalConsoleLog = console.log
+      
+      const logSpy = jest.spyOn(UniversalBypass, '_log')
+      UniversalBypass.suppressConsoleNoise()
+
+      expect(logSpy).toHaveBeenCalledWith('Protected site detected, console suppression disabled')
+      expect(console.log).toBe(originalConsoleLog) // Should not be modified
+
+      logSpy.mockRestore()
+      UniversalBypass._isProtectedSite.mockRestore()
+    })
+  })
+
+  describe('Enhanced Console Suppression', () => {
+    test('should suppress common error patterns', () => {
+      // Mock non-protected site
+      jest.spyOn(UniversalBypass, '_isProtectedSite').mockReturnValue(false)
+      
+      const capturedMessages = []
+      const originalConsoleError = console.error
+
+      console.error = (...args) => {
+        capturedMessages.push(args.join(' '))
+      }
+
+      UniversalBypass.suppressConsoleNoise()
+
+      // Test various error patterns
+      console.error('[GET_CSS]: result Object')
+      console.error('content-scripts.js:6697 [GET_CSS]: result Object')
+      console.error('Cannot read properties of undefined (reading \'classList\')')
+      console.error('The resource was preloaded using link preload but not used')
+
+      expect(capturedMessages).toHaveLength(0) // All should be suppressed
+
+      console.error = originalConsoleError
+      UniversalBypass._isProtectedSite.mockRestore()
+    })
+
+    test('should not suppress non-matching messages', () => {
+      // Mock non-protected site
+      jest.spyOn(UniversalBypass, '_isProtectedSite').mockReturnValue(false)
+      
+      const capturedMessages = []
+      const originalConsoleError = console.error
+
+      console.error = (...args) => {
+        capturedMessages.push(args.join(' '))
+      }
+
+      UniversalBypass.suppressConsoleNoise()
+
+      console.error('Important application error')
+      console.error('User authentication failed')
+
+      expect(capturedMessages).toHaveLength(2) // Should not be suppressed
+
+      console.error = originalConsoleError
+      UniversalBypass._isProtectedSite.mockRestore()
+    })
+  })
+
+  describe('Enhanced Element Removal Safety', () => {
+    test('should not remove essential elements', () => {
+      const essentialElements = [
+        { tagName: 'SCRIPT', remove: jest.fn(), parentNode: true },
+        { tagName: 'STYLE', remove: jest.fn(), parentNode: true },
+        { tagName: 'HTML', remove: jest.fn(), parentNode: true },
+        { tagName: 'BODY', remove: jest.fn(), parentNode: true }
+      ]
+
+      essentialElements.forEach(element => {
+        const result = UniversalBypass._removeElement(element)
+        expect(result).toBe(false)
+        expect(element.remove).not.toHaveBeenCalled()
+      })
+    })
+
+    test('should not remove elements with essential IDs', () => {
+      const elementWithEssentialId = {
+        tagName: 'DIV',
+        id: 'main-content',
+        remove: jest.fn(),
+        parentNode: true
+      }
+
+      const result = UniversalBypass._removeElement(elementWithEssentialId)
+      expect(result).toBe(false)
+      expect(elementWithEssentialId.remove).not.toHaveBeenCalled()
+    })
+
+    test('should not remove elements with event listeners', () => {
+      const elementWithListener = {
+        tagName: 'DIV',
+        id: 'ad-banner',
+        onclick: () => {},
+        remove: jest.fn(),
+        parentNode: true
+      }
+
+      const result = UniversalBypass._removeElement(elementWithListener)
+      expect(result).toBe(false)
+      expect(elementWithListener.remove).not.toHaveBeenCalled()
+    })
+
+    test('should safely remove non-essential elements', () => {
+      const safeElement = {
+        tagName: 'DIV',
+        id: 'ad-banner',
+        remove: jest.fn(),
+        parentNode: true
+      }
+
+      const result = UniversalBypass._removeElement(safeElement)
+      expect(result).toBe(true)
+      expect(safeElement.remove).toHaveBeenCalled()
+    })
+  })
 })

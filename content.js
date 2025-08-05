@@ -41,7 +41,41 @@
         'jsfiddle.net',
         'codesandbox.io',
         'repl.it',
-        'glitch.com'
+        'glitch.com',
+        // Adult sites that commonly have JavaScript functionality issues
+        'pornhub.com',
+        'xvideos.com',
+        'xnxx.com',
+        'redtube.com',
+        'youporn.com',
+        'tube8.com',
+        'spankbang.com',
+        'xhamster.com',
+        // Other sites with complex JavaScript functionality
+        'moneycontrol.com',
+        'bloomberg.com',
+        'reuters.com',
+        'cnn.com',
+        'bbc.com',
+        'netflix.com',
+        'youtube.com',
+        'twitch.tv',
+        'discord.com',
+        'slack.com',
+        'zoom.us',
+        'office.com',
+        'live.com',
+        'microsoft.com',
+        // Banking and financial sites
+        'paypal.com',
+        'stripe.com',
+        'visa.com',
+        'mastercard.com',
+        // E-commerce sites with complex checkouts
+        'amazon.com',
+        'ebay.com',
+        'walmart.com',
+        'target.com'
       ],
       BLOCKED_HOSTS: [
         // Analytics & Trackers
@@ -117,11 +151,19 @@
       ],
 
       CONSOLE_SUPPRESS: [
-        /^\[GET_CSS\]: result/,
+        /\[GET_CSS\]: result/,
         /net::ERR_BLOCKED_BY_CLIENT/,
         /Failed to load resource/,
         /Script error\./,
-        /Non-Error promise rejection captured/
+        /Non-Error promise rejection captured/,
+        /Cannot read properties of undefined/,
+        /reading 'classList'/,
+        /Uncaught TypeError/,
+        /was preloaded using link preload but not used/,
+        /Please make sure it has an appropriate `as` value/,
+        /The resource .* was preloaded/,
+        /Local Storage is supported/,
+        /overrideMethod @/
       ]
     },
 
@@ -194,6 +236,7 @@
         }
 
         this._log('Activating script v2.0.0...')
+        this.setupGlobalErrorHandler()
         this.suppressConsoleNoise()
         this.patchNetworkRequests()
         await this.restorePageFunctionality()
@@ -267,6 +310,56 @@
     },
 
     /**
+     * Sets up a global error handler to catch and suppress common JavaScript errors.
+     * @private
+     */
+    setupGlobalErrorHandler() {
+      try {
+        const isProtected = this._isProtectedSite()
+        
+        // Don't set up error handling on protected sites
+        if (isProtected) {
+          return
+        }
+
+        // Capture and suppress common errors that might be caused by blocked elements
+        window.addEventListener('error', (event) => {
+          const errorMessage = event.message || ''
+          const errorSource = event.filename || ''
+          
+          // Check if this is a common error pattern we should suppress
+          const shouldSuppress = this.config.CONSOLE_SUPPRESS.some(pattern => {
+            try {
+              return pattern.test(errorMessage) || pattern.test(errorSource)
+            } catch (_patternError) {
+              return false
+            }
+          })
+
+          if (shouldSuppress) {
+            event.preventDefault()
+            event.stopPropagation()
+            return false
+          }
+        }, true)
+
+        // Handle unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+          const errorMessage = event.reason ? String(event.reason) : ''
+          
+          // Check if this is a network error we caused
+          if (errorMessage.includes('Bypassed fetch to') || 
+              errorMessage.includes('net::ERR_BLOCKED_BY_CLIENT')) {
+            event.preventDefault()
+            return false
+          }
+        })
+      } catch (error) {
+        this._logError('setupGlobalErrorHandler', error)
+      }
+    },
+
+    /**
      * Checks if a given URL matches any of the blocked hosts.
      * @param {string} url - The URL to check.
      * @returns {boolean} - True if the URL is blocked, false otherwise.
@@ -312,16 +405,38 @@
     },
 
     /**
-     * Removes an element from the DOM safely.
+     * Removes an element from the DOM safely with additional safety checks.
      * @param {HTMLElement} element - The element to remove.
      * @private
      */
     _removeElement(element) {
       try {
-        if (element && element.parentNode && typeof element.remove === 'function') {
-          element.remove()
-          return true
+        if (!element || !element.parentNode || typeof element.remove !== 'function') {
+          return false
         }
+
+        // Additional safety checks to prevent breaking essential elements
+        const tagName = element.tagName ? element.tagName.toLowerCase() : ''
+        const elementId = element.id || ''
+
+        // Don't remove essential HTML elements
+        if (['html', 'head', 'body', 'script', 'style'].includes(tagName)) {
+          return false
+        }
+
+        // Don't remove elements that might be essential for functionality
+        if (elementId.includes('main') || elementId.includes('content') || 
+            elementId.includes('wrapper') || elementId.includes('container')) {
+          return false
+        }
+
+        // Check if element has event listeners (might be functional)
+        if (element.onclick || element.onload || element.onerror) {
+          return false
+        }
+
+        element.remove()
+        return true
       } catch (error) {
         this._logError('_removeElement', error)
       }
@@ -336,19 +451,42 @@
       try {
         const originalMethods = {}
 
+        // Only suppress on non-protected sites to avoid hiding important errors
+        const isProtected = this._isProtectedSite()
+        if (isProtected) {
+          this._log('Protected site detected, console suppression disabled')
+          return
+        }
+
         ;['log', 'warn', 'error'].forEach(level => {
-          originalMethods[level] = console[level]
-          console[level] = (...args) => {
-            const message = args.map(String).join(' ')
+          if (console[level] && !console[level]._bypassed) {
+            originalMethods[level] = console[level]
+            console[level] = (...args) => {
+              try {
+                const message = args.map(arg => {
+                  if (typeof arg === 'string') return arg
+                  if (arg && typeof arg === 'object') return arg.toString()
+                  return String(arg)
+                }).join(' ')
 
-            // Check if message should be suppressed
-            const shouldSuppress = this.config.CONSOLE_SUPPRESS.some(pattern =>
-              pattern.test(message)
-            )
+                // Check if message should be suppressed
+                const shouldSuppress = this.config.CONSOLE_SUPPRESS.some(pattern => {
+                  try {
+                    return pattern.test(message)
+                  } catch (_patternError) {
+                    return false
+                  }
+                })
 
-            if (!shouldSuppress) {
-              originalMethods[level].apply(console, args)
+                if (!shouldSuppress) {
+                  originalMethods[level].apply(console, args)
+                }
+              } catch (_messageError) {
+                // If we can't process the message, let it through
+                originalMethods[level].apply(console, args)
+              }
             }
+            console[level]._bypassed = true
           }
         })
       } catch (error) {
@@ -362,18 +500,31 @@
      */
     patchNetworkRequests() {
       try {
+        const isProtected = this._isProtectedSite()
+        
+        // Skip network patching on protected sites to avoid breaking functionality
+        if (isProtected) {
+          this._log('Protected site detected, network patching disabled')
+          return
+        }
+
         // Patch window.fetch
         if (window.fetch && !window.fetch._bypassed) {
           const originalFetch = window.fetch
           window.fetch = (resource, _init) => {
-            const url = (resource && typeof resource === 'object') ? resource.url : resource
+            try {
+              const url = (resource && typeof resource === 'object') ? resource.url : resource
 
-            if (this._isBlocked(url)) {
-              this._log(`Blocked fetch request to: ${url}`)
-              return Promise.reject(new Error(`Bypassed fetch to ${url}`))
+              if (this._isBlocked(url)) {
+                this._log(`Blocked fetch request to: ${url}`)
+                return Promise.reject(new Error(`Bypassed fetch to ${url}`))
+              }
+
+              return originalFetch.apply(window, arguments)
+            } catch (_error) {
+              // If there's an error in our interception, let the original request through
+              return originalFetch.apply(window, arguments)
             }
-
-            return originalFetch.apply(window, arguments)
           }
           window.fetch._bypassed = true
         }
@@ -385,9 +536,14 @@
           const originalSend = xhrProto.send
 
           xhrProto.open = function(method, url) {
-            this._uwbBlocked = UniversalBypass._isBlocked(url)
-            if (this._uwbBlocked) {
-              UniversalBypass._log(`Blocked XHR request to: ${url}`)
+            try {
+              this._uwbBlocked = UniversalBypass._isBlocked(url)
+              if (this._uwbBlocked) {
+                UniversalBypass._log(`Blocked XHR request to: ${url}`)
+              }
+            } catch (_error) {
+              // If there's an error checking, don't block
+              this._uwbBlocked = false
             }
             return originalOpen.apply(this, arguments)
           }
