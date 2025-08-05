@@ -264,18 +264,18 @@
     
     <div class="status">
       <div class="status-indicator">
-        <div class="status-dot active"></div>
-        <span>Active and protecting this page</span>
+        <div class="status-dot active" id="status-dot" aria-label="Extension status"></div>
+        <span id="status-text">Active and protecting this page</span>
       </div>
-      <div id="stats-container" class="stats-container"></div>
+      <div id="stats-container" class="stats-container" aria-live="polite"></div>
     </div>
 
     <div class="controls">
-      <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information">
-        Refresh
+      <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information" aria-label="Refresh current tab information">
+        🔄 Refresh
       </button>
-      <button id="toggle-button" class="btn btn-primary" title="Toggle bypass for this page">
-        Re-apply
+      <button id="toggle-button" class="btn btn-primary" title="Re-apply bypass for this page" aria-label="Re-apply bypass rules">
+        ⚡ Re-apply
       </button>
     </div>
     

@@ -53,7 +53,12 @@ const createMockDocument = () => {
 
 const createMockWindow = () => ({
   close: jest.fn(),
-  addEventListener: jest.fn()
+  addEventListener: jest.fn(),
+  location: {
+    href: 'chrome-extension://test/popup.html',
+    protocol: 'chrome-extension:',
+    host: 'test'
+  }
 })
 
 describe('PopupController', () => {

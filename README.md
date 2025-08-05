@@ -61,29 +61,55 @@ This major update brings significant improvements in code quality, performance, 
 
 ## 📦 Installation
 
-### From Chrome Web Store
-*Coming soon - extension is being prepared for Chrome Web Store submission*
+### Quick Start
+For detailed step-by-step instructions with screenshots, see our [**Complete Installation Guide**](INSTALLATION_GUIDE.md).
 
-### Manual Installation (Developer Mode)
-1. Download or clone this repository:
+### Method 1: Load Unpacked Extension (Recommended)
+1. **Download or clone this repository**:
    ```bash
    git clone https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector.git
    cd Universal-Web-Bypass-Injector
    ```
 
-2. Open Chrome and navigate to `chrome://extensions/`
+2. **Open Chrome Extensions page**:
+   - Navigate to `chrome://extensions/`
+   - Enable "Developer mode" (top-right toggle)
 
-3. Enable "Developer mode" in the top right corner
+3. **Load the extension**:
+   - Click "Load unpacked"
+   - Select the `Universal-Web-Bypass-Injector` folder
+   - Extension icon should appear in toolbar
 
-4. Click "Load unpacked" and select the extension folder
+4. **Verify installation**:
+   - Click the extension icon to open popup
+   - Should show "Active and protecting this page"
+   - Test on any website with ads/tracking
 
-5. The extension will be installed and ready to use
+### Method 2: Development Setup
+```bash
+# Clone and set up development environment
+git clone https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector.git
+cd Universal-Web-Bypass-Injector
+
+# Install dependencies
+npm install
+
+# Run tests and validation
+npm test
+npm run lint
+./validate-extension.sh
+
+# Load in Chrome as described in Method 1
+```
 
 ### Installation Verification
-After installation, you should see:
-- Extension icon in the Chrome toolbar
-- Right-click context menu option "Bypass restrictions on this page"
-- No console errors when visiting websites
+✅ Extension icon visible in Chrome toolbar  
+✅ Popup opens when clicking icon  
+✅ Right-click menu shows "Bypass restrictions on this page"  
+✅ Console shows `🛡️ UWB:` messages on websites  
+✅ Fewer ads and tracking scripts on websites  
+
+**Need help?** Check the [Complete Installation Guide](INSTALLATION_GUIDE.md) for detailed troubleshooting.
 
 ## 🔧 How It Works
 
