@@ -39,6 +39,7 @@ global.chrome = {
     getManifest: jest.fn(() => ({
       version: '2.0.0'
     })),
+    getURL: jest.fn((path) => `chrome-extension://test-id/${path}`),
     lastError: null
   },
   action: {
@@ -68,7 +69,12 @@ global.chrome = {
     onRemoved: createMockListener()
   },
   notifications: {
-    create: jest.fn()
+    create: jest.fn((options, callback) => {
+      if (callback) {
+        callback('notification-id')
+      }
+      return 'notification-id'
+    })
   },
   storage: {
     sync: {

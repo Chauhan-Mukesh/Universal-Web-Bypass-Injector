@@ -168,12 +168,23 @@ const BackgroundService = {
    */
   showWelcomeNotification() {
     try {
-      if (chrome.notifications) {
+      if (chrome && chrome.notifications && chrome.notifications.create) {
+        // Try with icon first
         chrome.notifications.create({
           type: 'basic',
-          iconUrl: 'icons/icon48.png',
+          iconUrl: chrome.runtime.getURL('icons/icon48.png'),
           title: 'Universal Web Bypass Injector',
           message: 'Extension installed! Your browsing experience is now enhanced with ad and paywall blocking.'
+        }, (_notificationId) => {
+          if (chrome.runtime.lastError) {
+            // If icon fails, try without icon
+            console.warn('[UWB Background] Icon failed, retrying without icon:', chrome.runtime.lastError)
+            chrome.notifications.create({
+              type: 'basic',
+              title: 'Universal Web Bypass Injector',
+              message: 'Extension installed! Your browsing experience is now enhanced with ad and paywall blocking.'
+            })
+          }
         })
       }
     } catch (_error) {
