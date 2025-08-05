@@ -1,0 +1,98 @@
+# 🤖 Dependabot Configuration
+# Automated dependency updates with intelligent scheduling and PR management
+
+version: 2
+updates:
+  # 📦 NPM Dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # 🎯 Advanced Configuration
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Chauhan-Mukesh"
+    assignees:
+      - "Chauhan-Mukesh"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    # 🏷️ Labels for organization
+    labels:
+      - "dependencies"
+      - "automated"
+      - "npm"
+    # 🚀 Version updates
+    versioning-strategy: "increase"
+    # 🔍 Allow specific updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+        update-type: "security"
+    # 🚫 Ignore specific packages (if needed)
+    ignore:
+      # Example: ignore major version updates for specific packages
+      # - dependency-name: "eslint"
+      #   update-types: ["version-update:semver-major"]
+    # 📋 Groups for related updates
+    groups:
+      testing:
+        patterns:
+          - "jest*"
+          - "@types/*"
+          - "*test*"
+      linting:
+        patterns:
+          - "eslint*"
+          - "prettier*"
+      build-tools:
+        patterns:
+          - "webpack*"
+          - "babel*"
+          - "rollup*"
+
+  # 🐳 Docker Dependencies (if any Dockerfiles exist)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "Chauhan-Mukesh"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+
+  # ⚡ GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "Chauhan-Mukesh"
+    assignees:
+      - "Chauhan-Mukesh"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci-cd"
+      - "automated"
+    # 🔍 Allow all GitHub Actions updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"

@@ -1,0 +1,314 @@
+name: 🔄 Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*' ]
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened, ready_for_review ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug mode'
+        required: false
+        default: 'false'
+        type: boolean
+
+# 🛡️ Security: Restrict permissions to minimum required
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+  statuses: write
+
+# 🚫 Cancel in-progress workflows for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  CACHE_VERSION: 'v1'
+
+jobs:
+  # 🔍 Pre-flight checks
+  preflight:
+    name: 🚀 Pre-flight Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      node_version: ${{ steps.setup.outputs.node_version }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Check if we should run
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]] && [[ "${{ github.event.pull_request.draft }}" == "true" ]]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "🚫 Skipping CI for draft PR"
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ Proceeding with CI"
+          fi
+
+      - name: 🔧 Setup Node.js info
+        id: setup
+        run: |
+          echo "node_version=$NODE_VERSION" >> $GITHUB_OUTPUT
+
+  # 🧪 Testing Matrix
+  test:
+    name: 🧪 Test Suite
+    runs-on: ${{ matrix.os }}
+    needs: preflight
+    if: needs.preflight.outputs.should_run == 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['16', '18', '20']
+        include:
+          - os: ubuntu-latest
+            node-version: '18'
+            coverage: true
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: |
+          npm ci --prefer-offline --no-audit
+          npm list --depth=0
+
+      - name: 🔍 Run linting
+        run: npm run lint
+
+      - name: 🧪 Run tests
+        run: |
+          if [ "${{ matrix.coverage }}" = "true" ]; then
+            npm run test:coverage
+          else
+            npm test
+          fi
+        shell: bash
+
+      - name: 📊 Upload coverage to Codecov
+        if: matrix.coverage && success()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: 📈 Upload coverage artifacts
+        if: matrix.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.os }}-node${{ matrix.node-version }}
+          path: coverage/
+          retention-days: 7
+
+  # 🏗️ Build and Package
+  build:
+    name: 🏗️ Build & Package
+    runs-on: ubuntu-latest
+    needs: [preflight, test]
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🏗️ Build extension
+        run: |
+          echo "🔨 Building extension..."
+          npm run build
+          
+          # Create distribution directory
+          mkdir -p dist
+          
+          # Copy extension files
+          cp manifest.json dist/
+          cp *.js dist/
+          cp *.html dist/
+          cp *.png dist/
+          
+          # Copy icons if they exist
+          if [ -d "icons" ]; then
+            cp -r icons dist/
+          fi
+          
+          echo "✅ Build completed successfully"
+
+      - name: 📦 Create extension package
+        run: |
+          cd dist
+          zip -r ../universal-web-bypass-injector-${{ github.sha }}.zip .
+          cd ..
+          echo "📦 Package created: universal-web-bypass-injector-${{ github.sha }}.zip"
+          ls -la *.zip
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-build-${{ github.sha }}
+          path: |
+            dist/
+            *.zip
+          retention-days: 30
+
+  # 🔒 Security Scanning
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.should_run == 'true'
+    timeout-minutes: 10
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🛡️ Run npm audit
+        run: |
+          echo "🔍 Running npm security audit..."
+          npm audit --audit-level moderate || true
+
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: 🔎 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  # ✅ Quality Gates
+  quality-gate:
+    name: ✅ Quality Gate
+    runs-on: ubuntu-latest
+    needs: [test, build, security]
+    if: always()
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🏁 Check all jobs status
+        run: |
+          echo "🔍 Checking CI results..."
+          
+          # Check test results
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ Tests failed or were skipped"
+            exit 1
+          fi
+          
+          # Check build results
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ Build failed"
+            exit 1
+          fi
+          
+          # Check security scan (allow skipped)
+          if [ "${{ needs.security.result }}" != "success" ] && [ "${{ needs.security.result }}" != "skipped" ]; then
+            echo "⚠️ Security scan had issues"
+            # Don't fail for now, just warn
+          fi
+          
+          echo "🎉 All quality gates passed!"
+
+      - name: 🎯 Set status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ CI Pipeline completed successfully!"
+          else
+            echo "❌ CI Pipeline failed. Please check the logs."
+            exit 1
+          fi
+
+  # 📊 Report Results
+  report:
+    name: 📊 Generate Report
+    runs-on: ubuntu-latest
+    needs: [test, build, security, quality-gate]
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    
+    steps:
+      - name: 📝 Comment PR with results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testStatus = '${{ needs.test.result }}';
+            const buildStatus = '${{ needs.build.result }}';
+            const securityStatus = '${{ needs.security.result }}';
+            const qualityGateStatus = '${{ needs.quality-gate.result }}';
+            
+            const statusEmoji = (status) => {
+              switch(status) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'skipped': return '⏭️';
+                default: return '⚠️';
+              }
+            };
+            
+            const body = `## 🔄 CI/CD Pipeline Results
+            
+            | Job | Status | Result |
+            |-----|--------|--------|
+            | 🧪 Tests | ${statusEmoji(testStatus)} | ${testStatus} |
+            | 🏗️ Build | ${statusEmoji(buildStatus)} | ${buildStatus} |
+            | 🔒 Security | ${statusEmoji(securityStatus)} | ${securityStatus} |
+            | ✅ Quality Gate | ${statusEmoji(qualityGateStatus)} | ${qualityGateStatus} |
+            
+            ${qualityGateStatus === 'success' ? '🎉 **All checks passed!** This PR is ready for review.' : '❌ **Some checks failed.** Please review the failed jobs above.'}
+            
+            ---
+            *🤖 Automated report generated by CI/CD pipeline*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

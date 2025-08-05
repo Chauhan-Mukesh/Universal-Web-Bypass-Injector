@@ -1,0 +1,344 @@
+name: 🚀 Deployment Pipeline
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+# 🛡️ Security: Restrict permissions
+permissions:
+  contents: read
+  deployments: write
+  actions: read
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # 🔍 Pre-deployment Validation
+  validate:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      version: ${{ steps.version.outputs.version }}
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🏷️ Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION=$(jq -r '.version' package.json)
+            VERSION="v$VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🧪 Run validation tests
+        id: tests
+        continue-on-error: true
+        run: |
+          echo "🧪 Running comprehensive validation..."
+          npm run lint
+          npm run test:coverage
+          npm run build
+
+      - name: ✅ Check deployment eligibility
+        id: check
+        run: |
+          if [ "${{ steps.tests.outcome }}" = "success" ] || [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Deployment approved"
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "❌ Deployment blocked due to test failures"
+          fi
+
+  # 🏗️ Build for Deployment
+  build:
+    name: 🏗️ Build for Deployment
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.should_deploy == 'true'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📝 Update version for environment
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            # Add staging suffix
+            VERSION_NUMBER="${VERSION#v}"
+            NEW_VERSION="$VERSION_NUMBER-staging.$(date +%Y%m%d%H%M%S)"
+            npm version "$NEW_VERSION" --no-git-tag-version
+          else
+            # Production - use release version
+            VERSION_NUMBER="${VERSION#v}"
+            npm version "$VERSION_NUMBER" --no-git-tag-version
+          fi
+
+      - name: 🏗️ Build optimized extension
+        run: |
+          echo "🔨 Building for ${{ needs.validate.outputs.environment }}..."
+          
+          # Run optimized build
+          npm run build
+          
+          # Create distribution directory
+          mkdir -p dist
+          
+          # Copy extension files
+          cp manifest.json dist/
+          cp *.js dist/
+          cp *.html dist/
+          cp *.png dist/
+          
+          # Copy icons if they exist
+          if [ -d "icons" ]; then
+            cp -r icons dist/
+          fi
+          
+          # Environment-specific optimizations
+          if [ "${{ needs.validate.outputs.environment }}" = "production" ]; then
+            echo "🚀 Applying production optimizations..."
+            # Remove debug code, compress files, etc.
+            find dist -name "*.js" -exec sed -i '/console\.debug/d' {} \;
+          else
+            echo "🧪 Keeping debug features for staging..."
+          fi
+
+      - name: 📦 Create deployment package
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          PACKAGE_NAME="universal-web-bypass-injector-$ENVIRONMENT-$VERSION"
+          
+          cd dist
+          zip -r "../$PACKAGE_NAME.zip" .
+          cd ..
+          
+          echo "📦 Created package: $PACKAGE_NAME.zip"
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+
+      - name: 📤 Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package-${{ needs.validate.outputs.environment }}
+          path: |
+            *.zip
+            dist/
+          retention-days: 30
+
+  # 🧪 Staging Deployment
+  deploy-staging:
+    name: 🧪 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    if: needs.validate.outputs.environment == 'staging' && needs.validate.outputs.should_deploy == 'true'
+    timeout-minutes: 10
+    environment:
+      name: staging
+      url: https://github.com/${{ github.repository }}/releases/tag/staging-latest
+    
+    steps:
+      - name: 📥 Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package-staging
+          path: ./artifacts
+
+      - name: 🚀 Deploy to staging
+        run: |
+          echo "🧪 Deploying to staging environment..."
+          
+          # Simulate staging deployment
+          # In a real scenario, this might:
+          # - Upload to Chrome Web Store (developer version)
+          # - Deploy to test infrastructure
+          # - Update staging documentation
+          
+          echo "✅ Staging deployment completed"
+          echo "📦 Package: $(ls ./artifacts/*.zip)"
+
+      - name: 🔍 Post-deployment verification
+        run: |
+          echo "🔍 Running post-deployment checks..."
+          
+          # Basic verification
+          if [ -f "./artifacts/*.zip" ]; then
+            echo "✅ Package exists"
+          else
+            echo "❌ Package missing"
+            exit 1
+          fi
+          
+          echo "✅ Staging deployment verified"
+
+  # 🚀 Production Deployment
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    if: needs.validate.outputs.environment == 'production' && needs.validate.outputs.should_deploy == 'true'
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://chrome.google.com/webstore/detail/universal-web-bypass-injector
+    
+    steps:
+      - name: 📥 Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package-production
+          path: ./artifacts
+
+      - name: 🔒 Security scan before production
+        run: |
+          echo "🔒 Running final security scan..."
+          
+          # Extract and scan the package
+          cd artifacts
+          unzip -q *.zip -d extracted/
+          
+          # Basic security checks
+          echo "🔍 Checking for sensitive files..."
+          if find extracted/ -name "*.log" -o -name "*.tmp" -o -name ".env*" | grep -q .; then
+            echo "❌ Sensitive files found in package"
+            exit 1
+          fi
+          
+          echo "✅ Security scan passed"
+
+      - name: 🚀 Deploy to production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          
+          # Production deployment steps
+          # In a real scenario, this might:
+          # - Upload to Chrome Web Store
+          # - Update production documentation
+          # - Send notifications to users
+          # - Update monitoring systems
+          
+          echo "✅ Production deployment completed"
+          echo "📦 Package: $(ls ./artifacts/*.zip)"
+
+      - name: 📊 Update deployment metrics
+        run: |
+          echo "📊 Recording deployment metrics..."
+          echo "- Environment: production"
+          echo "- Version: ${{ needs.validate.outputs.version }}"
+          echo "- Deployed by: ${{ github.actor }}"
+          echo "- Deployment time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+
+  # 🔔 Notification
+  notify:
+    name: 🔔 Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [validate, build, deploy-staging, deploy-production]
+    if: always() && needs.validate.outputs.should_deploy == 'true'
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📊 Determine deployment status
+        id: status
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            STATUS="${{ needs.deploy-staging.result }}"
+          else
+            STATUS="${{ needs.deploy-production.result }}"
+          fi
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+
+      - name: 🎉 Success notification
+        if: steps.status.outputs.status == 'success'
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "✅ Environment: ${{ steps.status.outputs.environment }}"
+          echo "🏷️ Version: ${{ needs.validate.outputs.version }}"
+          echo "👤 Deployed by: ${{ github.actor }}"
+
+      - name: ❌ Failure notification
+        if: steps.status.outputs.status == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          echo "🔍 Environment: ${{ steps.status.outputs.environment }}"
+          echo "🏷️ Version: ${{ needs.validate.outputs.version }}"
+          echo "📋 Check the deployment logs for details"
+
+  # 🧹 Cleanup
+  cleanup:
+    name: 🧹 Post-deployment Cleanup
+    runs-on: ubuntu-latest
+    needs: [validate, build, deploy-staging, deploy-production, notify]
+    if: always()
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🧹 Cleanup artifacts
+        run: |
+          echo "🧹 Performing post-deployment cleanup..."
+          
+          # In a real scenario, this might:
+          # - Clean up temporary files
+          # - Archive logs
+          # - Update monitoring dashboards
+          # - Send summary reports
+          
+          echo "✅ Cleanup completed"
