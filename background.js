@@ -20,8 +20,17 @@ const BackgroundService = {
   stats: {
     sessionsActive: 0,
     totalBlocked: 0,
-    lastActivity: null
+    lastActivity: null,
+    sessionStartTime: Date.now(),
+    blockedRequests: [],
+    siteStatistics: {}
   },
+
+  /**
+   * Disabled sites storage.
+   * @type {Set<string>}
+   */
+  disabledSites: new Set(),
 
   /**
    * Active tab information.
@@ -33,10 +42,56 @@ const BackgroundService = {
    * Initializes the background service.
    * @public
    */
-  init() {
-    this.setupEventListeners()
-    this.setupContextMenu()
-    console.log('[UWB Background] Service initialized successfully')
+  async init() {
+    try {
+      // Set up event listeners immediately (synchronous)
+      this.setupEventListeners()
+      this.setupContextMenu()
+      
+      // Load storage data asynchronously
+      await this.loadStorageData()
+      
+      console.log('[UWB Background] Service initialized successfully')
+    } catch (error) {
+      console.error('[UWB Background] Error during initialization:', error)
+    }
+  },
+
+  /**
+   * Loads data from storage.
+   * @private
+   */
+  async loadStorageData() {
+    try {
+      const result = await chrome.storage.sync.get(['disabledSites', 'statistics'])
+      
+      if (result.disabledSites) {
+        this.disabledSites = new Set(result.disabledSites)
+      }
+      
+      if (result.statistics) {
+        this.stats = { ...this.stats, ...result.statistics }
+      }
+      
+      console.log('[UWB Background] Loaded storage data')
+    } catch (error) {
+      console.error('[UWB Background] Error loading storage data:', error)
+    }
+  },
+
+  /**
+   * Saves data to storage.
+   * @private
+   */
+  async saveStorageData() {
+    try {
+      await chrome.storage.sync.set({
+        disabledSites: Array.from(this.disabledSites),
+        statistics: this.stats
+      })
+    } catch (error) {
+      console.error('[UWB Background] Error saving storage data:', error)
+    }
   },
 
   /**
@@ -190,13 +245,22 @@ const BackgroundService = {
     try {
       switch (request.action) {
         case 'getTabInfo':
-          this.handleGetTabInfo(sender, sendResponse)
+          this.handleGetTabInfo(request, sender, sendResponse)
+          break
+        case 'getSiteStatus':
+          this.handleGetSiteStatus(request, sender, sendResponse)
+          break
+        case 'setSiteStatus':
+          this.handleSetSiteStatus(request, sender, sendResponse)
           break
         case 'bypassStatus':
           this.handleBypassStatus(request, sender, sendResponse)
           break
         case 'getStats':
           sendResponse(this.getStats())
+          break
+        case 'getDetailedStats':
+          sendResponse(this.getDetailedStats())
           break
         case 'resetStats':
           this.resetStats()
@@ -218,26 +282,80 @@ const BackgroundService = {
 
   /**
    * Handles tab information requests.
+   * @param {Object} request - Request object.
    * @param {Object} sender - Message sender.
    * @param {Function} sendResponse - Response callback.
    * @private
    */
-  handleGetTabInfo(sender, sendResponse) {
+  handleGetTabInfo(request, sender, sendResponse) {
     try {
-      const tabInfo = {
+      const tabId = request.tabId || sender.tab?.id
+      const tabInfo = this.activeTabs.get(tabId) || {}
+      
+      const response = {
         url: sender.tab?.url || 'unknown',
         title: sender.tab?.title || 'unknown',
-        id: sender.tab?.id || -1,
+        id: tabId || -1,
+        totalBlocked: tabInfo.blockedCount || 0,
+        bypassActive: tabInfo.bypassActive || false,
+        lastActivity: tabInfo.lastActivity,
+        sessionStartTime: this.stats.sessionStartTime,
         timestamp: Date.now()
       }
 
-      if (sender.tab?.id) {
-        this.updateTabInfo(sender.tab.id, tabInfo)
+      if (tabId) {
+        this.updateTabInfo(tabId, response)
       }
 
-      sendResponse(tabInfo)
+      sendResponse(response)
     } catch (error) {
       console.error('[UWB Background] Error getting tab info:', error)
+      sendResponse({ error: error.message })
+    }
+  },
+
+  /**
+   * Handles site status requests.
+   * @param {Object} request - Request object.
+   * @param {Object} sender - Message sender.
+   * @param {Function} sendResponse - Response callback.
+   * @private
+   */
+  handleGetSiteStatus(request, sender, sendResponse) {
+    try {
+      const hostname = request.hostname
+      const enabled = !this.disabledSites.has(hostname)
+      
+      sendResponse({ enabled, hostname })
+    } catch (error) {
+      console.error('[UWB Background] Error getting site status:', error)
+      sendResponse({ error: error.message })
+    }
+  },
+
+  /**
+   * Handles site status updates.
+   * @param {Object} request - Request object.
+   * @param {Object} sender - Message sender.
+   * @param {Function} sendResponse - Response callback.
+   * @private
+   */
+  async handleSetSiteStatus(request, sender, sendResponse) {
+    try {
+      const hostname = request.hostname
+      const enabled = request.enabled
+
+      if (enabled) {
+        this.disabledSites.delete(hostname)
+      } else {
+        this.disabledSites.add(hostname)
+      }
+
+      await this.saveStorageData()
+      
+      sendResponse({ success: true, enabled, hostname })
+    } catch (error) {
+      console.error('[UWB Background] Error setting site status:', error)
       sendResponse({ error: error.message })
     }
   },
@@ -253,19 +371,58 @@ const BackgroundService = {
     try {
       const tabId = sender.tab?.id
       const url = request.url || sender.tab?.url
+      const hostname = url ? new URL(url).hostname : 'unknown'
+
+      // Check if site is disabled
+      if (this.disabledSites.has(hostname)) {
+        sendResponse({ success: false, disabled: true })
+        return
+      }
 
       console.log(`[UWB Background] Bypass applied on: ${url}`)
 
       if (tabId) {
+        const existingInfo = this.activeTabs.get(tabId) || {}
         this.updateTabInfo(tabId, {
           bypassActive: true,
           lastBypassTime: Date.now(),
-          url
+          url,
+          blockedCount: (existingInfo.blockedCount || 0) + (request.blockedCount || 1)
         })
       }
 
       this.stats.totalBlocked += request.blockedCount || 1
       this.stats.lastActivity = Date.now()
+
+      // Track blocked requests for statistics
+      const blockedItem = {
+        url: request.blockedUrl || url,
+        hostname,
+        type: request.type || 'unknown',
+        timestamp: Date.now(),
+        tabId
+      }
+      
+      this.stats.blockedRequests.push(blockedItem)
+      
+      // Keep only last 1000 blocked requests
+      if (this.stats.blockedRequests.length > 1000) {
+        this.stats.blockedRequests = this.stats.blockedRequests.slice(-1000)
+      }
+
+      // Update site statistics
+      if (!this.stats.siteStatistics[hostname]) {
+        this.stats.siteStatistics[hostname] = {
+          blocked: 0,
+          lastActivity: null,
+          firstActivity: Date.now()
+        }
+      }
+      this.stats.siteStatistics[hostname].blocked += request.blockedCount || 1
+      this.stats.siteStatistics[hostname].lastActivity = Date.now()
+
+      // Save periodically
+      this.saveStorageData()
 
       sendResponse({ success: true, stats: this.getStats() })
     } catch (error) {
@@ -441,7 +598,50 @@ const BackgroundService = {
     return {
       ...this.stats,
       activeTabsCount: this.activeTabs.size,
-      uptime: Date.now() - (this.stats.startTime || Date.now())
+      uptime: Date.now() - (this.stats.sessionStartTime || Date.now()),
+      disabledSitesCount: this.disabledSites.size
+    }
+  },
+
+  /**
+   * Gets detailed statistics for the statistics page.
+   * @returns {Object} Detailed statistics object.
+   * @public
+   */
+  getDetailedStats() {
+    const now = Date.now()
+    const dayMs = 24 * 60 * 60 * 1000
+    const weekMs = 7 * dayMs
+    
+    const todayBlocked = this.stats.blockedRequests.filter(req => 
+      now - req.timestamp < dayMs
+    ).length
+    
+    const weekBlocked = this.stats.blockedRequests.filter(req => 
+      now - req.timestamp < weekMs
+    ).length
+
+    // Group by type
+    const typeStats = {}
+    this.stats.blockedRequests.forEach(req => {
+      typeStats[req.type] = (typeStats[req.type] || 0) + 1
+    })
+
+    // Top blocked sites
+    const siteStats = Object.entries(this.stats.siteStatistics)
+      .sort(([,a], [,b]) => b.blocked - a.blocked)
+      .slice(0, 10)
+
+    return {
+      total: this.stats.totalBlocked,
+      today: todayBlocked,
+      week: weekBlocked,
+      byType: typeStats,
+      topSites: siteStats,
+      recentBlocked: this.stats.blockedRequests.slice(-50).reverse(),
+      uptime: now - this.stats.sessionStartTime,
+      disabledSites: Array.from(this.disabledSites),
+      activeTabs: this.activeTabs.size
     }
   },
 
@@ -449,13 +649,16 @@ const BackgroundService = {
    * Resets extension statistics.
    * @public
    */
-  resetStats() {
+  async resetStats() {
     this.stats = {
       sessionsActive: 0,
       totalBlocked: 0,
       lastActivity: null,
-      startTime: Date.now()
+      sessionStartTime: Date.now(),
+      blockedRequests: [],
+      siteStatistics: {}
     }
+    await this.saveStorageData()
     console.log('[UWB Background] Statistics reset')
   }
 }

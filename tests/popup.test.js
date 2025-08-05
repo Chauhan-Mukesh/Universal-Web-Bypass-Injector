@@ -3,6 +3,27 @@
  * @description Basic tests for popup functionality without JSDOM complications
  */
 
+// Mock Chrome APIs before any imports
+global.chrome = {
+  runtime: {
+    sendMessage: jest.fn(),
+    getManifest: jest.fn(() => ({
+      version: '2.0.0',
+      name: 'Universal Web Bypass Injector'
+    })),
+    getURL: jest.fn((path) => `chrome-extension://test/${path}`),
+    lastError: null
+  },
+  tabs: {
+    query: jest.fn(),
+    create: jest.fn(),
+    reload: jest.fn()
+  },
+  action: {
+    openPopup: jest.fn()
+  }
+}
+
 describe('PopupController - Basic Tests', () => {
   test('should be able to check extension activity on different URLs', () => {
     // Test URL activity detection logic
@@ -236,5 +257,155 @@ describe('PopupController - Basic Tests', () => {
 
     expect(versionInfo).toBe('v2.0.0 | Universal Web Bypass Injector')
     expect(chrome.runtime.getManifest).toHaveBeenCalled()
+  })
+
+  describe('Site Toggle Functionality', () => {
+    beforeEach(() => {
+      // Mock DOM elements for site toggle
+      document.body.innerHTML = `
+        <div class="toggle-switch" id="site-toggle"></div>
+        <span id="blocked-count">0</span>
+        <span id="session-time">0m</span>
+        <div id="stats-summary" style="display: none;"></div>
+        <div class="status-dot"></div>
+        <span class="status-text"></span>
+      `
+      
+      // Mock PopupController
+      global.PopupController = {
+        elements: {
+          siteToggle: document.getElementById('site-toggle'),
+          blockedCount: document.getElementById('blocked-count'),
+          sessionTime: document.getElementById('session-time'),
+          statsSummary: document.getElementById('stats-summary'),
+          statusDot: document.querySelector('.status-dot'),
+          statusText: document.querySelector('.status-text')
+        },
+        siteStatus: { enabled: true, hostname: null },
+        stats: {},
+        currentTab: null,
+        updateSiteToggle: function() {
+          if (!this.elements.siteToggle) return
+          const isEnabled = this.siteStatus.enabled
+          this.elements.siteToggle.className = isEnabled ? 'toggle-switch active' : 'toggle-switch'
+          this.elements.siteToggle.setAttribute('aria-checked', isEnabled.toString())
+        },
+        updateStatistics: function() {
+          if (!this.elements.statsSummary) return
+          if (this.stats.totalBlocked > 0 || this.stats.sessionsActive > 0) {
+            this.elements.statsSummary.style.display = 'block'
+            if (this.elements.blockedCount) {
+              this.elements.blockedCount.textContent = this.stats.totalBlocked || this.stats.blocked || 0
+            }
+            if (this.elements.sessionTime) {
+              const sessionMinutes = Math.floor((Date.now() - this.stats.sessionStartTime) / 60000)
+              this.elements.sessionTime.textContent = `${sessionMinutes}m`
+            }
+          } else {
+            this.elements.statsSummary.style.display = 'none'
+          }
+        },
+        updateStatus: function() {
+          const isActive = this.currentTab && this.siteStatus.enabled
+          if (this.elements.statusDot) {
+            this.elements.statusDot.className = isActive ? 'status-dot active' : 'status-dot inactive'
+          }
+          if (this.elements.statusText) {
+            this.elements.statusText.textContent = isActive
+              ? 'Active and protecting this page'
+              : this.siteStatus.enabled ? 'Inactive on this page' : 'Disabled for this site'
+          }
+        },
+        showMessage: function(message, _type = 'info') {
+          let messageContainer = document.getElementById('message-container')
+          if (!messageContainer) {
+            messageContainer = document.createElement('div')
+            messageContainer.id = 'message-container'
+            document.body.appendChild(messageContainer)
+          }
+          messageContainer.textContent = message
+          messageContainer.style.display = 'block'
+        },
+        openStatisticsPage: function() {
+          chrome.tabs.create({ url: chrome.runtime.getURL('statistics.html') })
+          if (window.close) window.close()
+        }
+      }
+    })
+
+    test('should update site toggle display', () => {
+      global.PopupController.siteStatus.enabled = true
+      global.PopupController.updateSiteToggle()
+
+      expect(global.PopupController.elements.siteToggle.className).toBe('toggle-switch active')
+      expect(global.PopupController.elements.siteToggle.getAttribute('aria-checked')).toBe('true')
+    })
+
+    test('should update site toggle display when disabled', () => {
+      global.PopupController.siteStatus.enabled = false
+      global.PopupController.updateSiteToggle()
+
+      expect(global.PopupController.elements.siteToggle.className).toBe('toggle-switch')
+      expect(global.PopupController.elements.siteToggle.getAttribute('aria-checked')).toBe('false')
+    })
+
+    test('should update statistics display with data', () => {
+      global.PopupController.stats = {
+        totalBlocked: 25,
+        sessionStartTime: Date.now() - 120000, // 2 minutes ago
+        blocked: 10
+      }
+
+      global.PopupController.updateStatistics()
+
+      expect(global.PopupController.elements.blockedCount.textContent).toBe('25')
+      expect(global.PopupController.elements.sessionTime.textContent).toBe('2m')
+      expect(global.PopupController.elements.statsSummary.style.display).toBe('block')
+    })
+
+    test('should hide statistics when no data', () => {
+      global.PopupController.stats = {
+        totalBlocked: 0,
+        blocked: 0,
+        sessionsActive: 0
+      }
+
+      global.PopupController.updateStatistics()
+
+      expect(global.PopupController.elements.statsSummary.style.display).toBe('none')
+    })
+
+    test('should handle statistics page opening', () => {
+      const mockCreate = jest.fn()
+      const mockClose = jest.fn()
+      
+      chrome.tabs.create = mockCreate
+      global.window.close = mockClose
+
+      global.PopupController.openStatisticsPage()
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        url: chrome.runtime.getURL('statistics.html')
+      })
+    })
+
+    test('should show success message', () => {
+      global.PopupController.showMessage('Test message', 'success')
+
+      const messageContainer = document.getElementById('message-container')
+      expect(messageContainer).toBeTruthy()
+      expect(messageContainer.textContent).toBe('Test message')
+      expect(messageContainer.style.display).toBe('block')
+    })
+
+    test('should update status with site disabled state', () => {
+      global.PopupController.siteStatus.enabled = false
+      global.PopupController.currentTab = { url: 'https://example.com' }
+
+      global.PopupController.updateStatus()
+
+      expect(global.PopupController.elements.statusDot.className).toBe('status-dot inactive')
+      expect(global.PopupController.elements.statusText.textContent).toBe('Disabled for this site')
+    })
   })
 })

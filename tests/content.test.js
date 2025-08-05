@@ -385,4 +385,87 @@ describe('UniversalBypass Content Script', () => {
       consoleSpy.mockRestore()
     })
   })
+
+  describe('Site Status Checking', () => {
+    test('should check if site is enabled', async() => {
+      const mockResponse = { enabled: true }
+      
+      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        expect(message.action).toBe('getSiteStatus')
+        expect(message.hostname).toBe('example.com')
+        callback(mockResponse)
+      })
+
+      const isEnabled = await UniversalBypass._checkSiteEnabled('example.com')
+
+      expect(isEnabled).toBe(true)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalled()
+    })
+
+    test('should handle disabled site', async() => {
+      const mockResponse = { enabled: false }
+      
+      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback(mockResponse)
+      })
+
+      const isEnabled = await UniversalBypass._checkSiteEnabled('disabled.com')
+
+      expect(isEnabled).toBe(false)
+    })
+
+    test('should default to enabled on error', async() => {
+      chrome.runtime.sendMessage = jest.fn((_message, _callback) => {
+        throw new Error('Communication error')
+      })
+
+      const isEnabled = await UniversalBypass._checkSiteEnabled('example.com')
+
+      expect(isEnabled).toBe(true)
+    })
+
+    test('should skip initialization for disabled sites', async() => {
+      // Mock window.location using delete and redefine
+      delete window.location
+      window.location = { hostname: 'disabled.com' }
+
+      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback({ enabled: false })
+      })
+
+      const suppressConsoleNoiseSpy = jest.spyOn(UniversalBypass, 'suppressConsoleNoise')
+      const patchNetworkRequestsSpy = jest.spyOn(UniversalBypass, 'patchNetworkRequests')
+
+      // Reset initialization state
+      UniversalBypass.initialized = false
+
+      await UniversalBypass.init()
+
+      expect(UniversalBypass.initialized).toBe(false)
+      expect(suppressConsoleNoiseSpy).not.toHaveBeenCalled()
+      expect(patchNetworkRequestsSpy).not.toHaveBeenCalled()
+    })
+
+    test('should proceed with initialization for enabled sites', async() => {
+      // Mock window.location using delete and redefine
+      delete window.location
+      window.location = { hostname: 'enabled.com' }
+
+      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback({ enabled: true })
+      })
+
+      const suppressConsoleNoiseSpy = jest.spyOn(UniversalBypass, 'suppressConsoleNoise')
+      const patchNetworkRequestsSpy = jest.spyOn(UniversalBypass, 'patchNetworkRequests')
+
+      // Reset initialization state
+      UniversalBypass.initialized = false
+
+      await UniversalBypass.init()
+
+      expect(UniversalBypass.initialized).toBe(true)
+      expect(suppressConsoleNoiseSpy).toHaveBeenCalled()
+      expect(patchNetworkRequestsSpy).toHaveBeenCalled()
+    })
+  })
 })
