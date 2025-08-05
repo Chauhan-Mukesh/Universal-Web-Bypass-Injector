@@ -30,8 +30,19 @@
      * @property {RegExp[]} BLOCKED_HOSTS - A list of compiled regex for blocked domains.
      * @property {string[]} SELECTORS_TO_REMOVE - CSS selectors for elements to remove from the DOM.
      * @property {string[]} CONSOLE_SUPPRESS - Console message patterns to suppress.
+     * @property {string[]} PROTECTED_SITES - Sites where we should be more conservative.
      */
     config: {
+      PROTECTED_SITES: [
+        'dev.to',
+        'github.com',
+        'stackoverflow.com',
+        'codepen.io',
+        'jsfiddle.net',
+        'codesandbox.io',
+        'repl.it',
+        'glitch.com'
+      ],
       BLOCKED_HOSTS: [
         // Analytics & Trackers
         'sb\\.scorecardresearch\\.com',
@@ -75,33 +86,34 @@
       ].map(pattern => new RegExp('^https?://([^/]+\\.)?' + pattern, 'i')),
 
       SELECTORS_TO_REMOVE: [
-        // Ad/Anti-adblock overlays
+        // Ad/Anti-adblock overlays - more specific selectors
         '.adblock-overlay',
         '.disable-adblock',
-        '[class*="adblock"]',
-        // Paywalls/Overlays
-        '.paywall',
-        '.overlay',
-        '[class*="paywall"]',
-        '[id*="paywall"]',
+        '[class*="adblock-"][class*="modal"]',
+        '[class*="adblock-"][class*="popup"]',
+        // Paywalls/Overlays - more specific
+        '.paywall-overlay',
+        '.paywall-modal',
+        '.subscription-overlay',
+        '[class*="paywall"][class*="overlay"]',
+        '[class*="paywall"][class*="modal"]',
+        '[id*="paywall"][class*="overlay"]',
+        '[id*="paywall"][class*="modal"]',
         // Known ad containers
         '[data-ad-container]',
         '[data-ad-unit]',
-        'iframe[src*="ads"]',
-        '[class*="google-ad"]',
-        '[id*="google_ads"]',
-        // Additional common selectors
-        '.popup-overlay',
-        '.modal-backdrop',
-        '.cookie-banner',
-        '.gdpr-banner',
-        '[class*="modal"]',
-        '[class*="popup"]',
-        '[id*="popup"]',
+        'iframe[src*="doubleclick"]',
+        'iframe[src*="googlesyndication"]',
+        '[class^="google-ad-"]',
+        '[id^="google_ads"]',
+        // Additional specific selectors
         '.subscription-wall',
         '.premium-content-overlay',
-        '[class*="subscribe"]',
-        '[class*="membership"]'
+        '.membership-paywall',
+        // Cookie/GDPR banners (commonly problematic)
+        '.cookie-banner[style*="fixed"]',
+        '.gdpr-banner[style*="fixed"]',
+        '[class*="cookie"][class*="banner"][style*="z-index"]'
       ],
 
       CONSOLE_SUPPRESS: [
@@ -198,6 +210,18 @@
     },
 
     /**
+     * Checks if the current site is in the protected sites list.
+     * @returns {boolean} - True if the site should use conservative cleaning.
+     * @private
+     */
+    _isProtectedSite() {
+      const hostname = window.location.hostname.toLowerCase()
+      return this.config.PROTECTED_SITES.some(site => 
+        hostname === site || hostname.endsWith('.' + site)
+      )
+    },
+
+    /**
      * Checks if the extension is enabled for the current site.
      * @param {string} hostname - The hostname to check.
      * @returns {Promise<boolean>} - True if enabled, false if disabled.
@@ -255,6 +279,34 @@
         return this.config.BLOCKED_HOSTS.some(regex => regex.test(url))
       } catch (error) {
         this._logError('_isBlocked', error)
+        return false
+      }
+    },
+
+    /**
+     * Determines if an element is likely an ad or unwanted content.
+     * @param {HTMLElement} element - The element to check.
+     * @returns {boolean} - True if the element is likely an ad.
+     * @private
+     */
+    _isLikelyAd(element) {
+      try {
+        const className = element.className || ''
+        const id = element.id || ''
+        
+        // Check for common ad indicators
+        const hasAdKeywords = /ad|advertisement|sponsor|promo|banner/i.test(className + ' ' + id)
+        const hasAdSize = (element.offsetWidth === 728 && element.offsetHeight === 90) || // Leaderboard
+                         (element.offsetWidth === 300 && element.offsetHeight === 250) || // Medium Rectangle
+                         (element.offsetWidth === 320 && element.offsetHeight === 50)    // Mobile Banner
+        
+        // Don't remove if it contains essential content indicators
+        const hasEssentialContent = element.querySelector('article, main, .content, [role="main"], [role="article"]')
+        const isNavigation = /nav|menu|header|footer/i.test(className + ' ' + id)
+        
+        return hasAdKeywords || hasAdSize && !hasEssentialContent && !isNavigation
+      } catch (error) {
+        this._logError('_isLikelyAd', error)
         return false
       }
     },
@@ -360,37 +412,72 @@
     cleanDOM(nodes) {
       try {
         const scope = nodes ? Array.from(nodes) : [document.documentElement]
+        const isProtected = this._isProtectedSite()
         let removedCount = 0
 
         if (!scope.length) return
 
-        // Remove elements matching the selector list
-        const selectors = this.config.SELECTORS_TO_REMOVE.join(', ')
+        // Be more conservative on protected sites
+        if (isProtected) {
+          this._log('Protected site detected, using conservative cleaning')
+          // Only remove obvious ad/paywall elements on protected sites
+          const conservativeSelectors = [
+            '.adblock-overlay',
+            '.disable-adblock',
+            '.paywall-overlay',
+            '.paywall-modal',
+            '.subscription-overlay',
+            '[data-ad-container]',
+            '[data-ad-unit]',
+            'iframe[src*="doubleclick"]',
+            'iframe[src*="googlesyndication"]'
+          ].join(', ')
 
-        scope.forEach(node => {
-          if (!node || !node.nodeType) return
-
-          try {
-            // Check if the node itself is an element and matches
-            if (node.matches && node.matches(selectors)) {
-              if (this._removeElement(node)) {
-                removedCount++
+          scope.forEach(node => {
+            if (!node || !node.nodeType) return
+            try {
+              if (node.querySelectorAll) {
+                const elementsToRemove = node.querySelectorAll(conservativeSelectors)
+                elementsToRemove.forEach(element => {
+                  // Additional validation for protected sites
+                  if (this._isLikelyAd(element) && this._removeElement(element)) {
+                    removedCount++
+                  }
+                })
               }
+            } catch (error) {
+              this._logError('cleanDOM conservative mode', error)
             }
+          })
+        } else {
+          // Normal cleaning for other sites
+          const selectors = this.config.SELECTORS_TO_REMOVE.join(', ')
 
-            // Query for children matching the selectors
-            if (node.querySelectorAll) {
-              const elementsToRemove = node.querySelectorAll(selectors)
-              elementsToRemove.forEach(element => {
-                if (this._removeElement(element)) {
+          scope.forEach(node => {
+            if (!node || !node.nodeType) return
+
+            try {
+              // Check if the node itself is an element and matches
+              if (node.matches && node.matches(selectors)) {
+                if (this._removeElement(node)) {
                   removedCount++
                 }
-              })
+              }
+
+              // Query for children matching the selectors
+              if (node.querySelectorAll) {
+                const elementsToRemove = node.querySelectorAll(selectors)
+                elementsToRemove.forEach(element => {
+                  if (this._removeElement(element)) {
+                    removedCount++
+                  }
+                })
+              }
+            } catch (error) {
+              this._logError('cleanDOM selector matching', error)
             }
-          } catch (error) {
-            this._logError('cleanDOM selector matching', error)
-          }
-        })
+          })
+        }
 
         // Remove elements with src attributes pointing to blocked hosts
         const srcSelectors = 'script[src], iframe[src], img[src], embed[src], object[data]'
@@ -428,8 +515,10 @@
           }
         })
 
-        // Remove high z-index overlays (likely modals/paywalls)
-        this._removeHighZIndexOverlays(scope)
+        // Remove high z-index overlays (likely modals/paywalls) - skip for protected sites
+        if (!isProtected) {
+          this._removeHighZIndexOverlays(scope)
+        }
 
         if (removedCount > 0) {
           this._log(`Cleaned ${removedCount} elements from DOM`)
