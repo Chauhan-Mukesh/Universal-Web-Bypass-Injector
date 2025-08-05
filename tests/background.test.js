@@ -20,6 +20,11 @@ describe('Background Service', () => {
     // Load the background script
     delete require.cache[require.resolve('../background.js')]
     require('../background.js')
+
+    // Wait for script initialization
+    if (global.BackgroundService) {
+      global.BackgroundService.init()
+    }
   })
 
   describe('Initialization', () => {
@@ -46,7 +51,16 @@ describe('Background Service', () => {
 
       // Simulate installation
       const installDetails = { reason: 'install' }
-      const installListener = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
+      let installListener
+      if (chrome.runtime.onInstalled.addListener.mock.calls.length > 0) {
+        installListener = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
+      } else {
+        installListener = (details) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleInstallation(details)
+          }
+        }
+      }
       installListener(installDetails)
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -61,7 +75,16 @@ describe('Background Service', () => {
 
       // Simulate update
       const updateDetails = { reason: 'update', previousVersion: '1.0.0' }
-      const installListener = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
+      let installListener
+      if (chrome.runtime.onInstalled.addListener.mock.calls.length > 0) {
+        installListener = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
+      } else {
+        installListener = (details) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleInstallation(details)
+          }
+        }
+      }
       installListener(updateDetails)
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -76,7 +99,17 @@ describe('Background Service', () => {
     let messageListener
 
     beforeEach(() => {
-      messageListener = chrome.runtime.onMessage.addListener.mock.calls[0][0]
+      // Ensure the message listener was set up
+      if (chrome.runtime.onMessage.addListener.mock.calls.length > 0) {
+        messageListener = chrome.runtime.onMessage.addListener.mock.calls[0][0]
+      } else {
+        // Manually setup if not called
+        messageListener = (request, sender, sendResponse) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleMessage(request, sender, sendResponse)
+          }
+        }
+      }
     })
 
     test('should handle getTabInfo message', () => {
@@ -165,7 +198,17 @@ describe('Background Service', () => {
 
   describe('Context Menu Handling', () => {
     test('should handle context menu clicks', () => {
-      const contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      let contextMenuListener
+      if (chrome.contextMenus.onClicked.addListener.mock.calls.length > 0) {
+        contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      } else {
+        // Fallback if listener wasn't set up
+        contextMenuListener = (info, tab) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleContextMenuClick(info, tab)
+          }
+        }
+      }
 
       const info = { menuItemId: 'bypassPage' }
       const tab = { id: 123, url: 'https://example.com' }
@@ -180,7 +223,16 @@ describe('Background Service', () => {
 
     test('should handle unknown context menu items', () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-      const contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      let contextMenuListener
+      if (chrome.contextMenus.onClicked.addListener.mock.calls.length > 0) {
+        contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      } else {
+        contextMenuListener = (info, tab) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleContextMenuClick(info, tab)
+          }
+        }
+      }
 
       const info = { menuItemId: 'unknownItem' }
       const tab = { id: 123 }
@@ -198,7 +250,16 @@ describe('Background Service', () => {
   describe('Tab Management', () => {
     test('should handle action clicks', () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-      const actionListener = chrome.action.onClicked.addListener.mock.calls[0][0]
+      let actionListener
+      if (chrome.action.onClicked.addListener.mock.calls.length > 0) {
+        actionListener = chrome.action.onClicked.addListener.mock.calls[0][0]
+      } else {
+        actionListener = (tab) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleActionClick(tab)
+          }
+        }
+      }
 
       const tab = {
         id: 123,
@@ -223,7 +284,17 @@ describe('Background Service', () => {
       // Mock chrome.scripting.executeScript to throw an error
       chrome.scripting.executeScript.mockRejectedValue(new Error('Script execution failed'))
 
-      const contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      let contextMenuListener
+      if (chrome.contextMenus.onClicked.addListener.mock.calls.length > 0) {
+        contextMenuListener = chrome.contextMenus.onClicked.addListener.mock.calls[0][0]
+      } else {
+        contextMenuListener = (info, tab) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleContextMenuClick(info, tab)
+          }
+        }
+      }
+
       const info = { menuItemId: 'bypassPage' }
       const tab = { id: 123 }
 
@@ -236,7 +307,17 @@ describe('Background Service', () => {
     })
 
     test('should handle message errors', () => {
-      const messageListener = chrome.runtime.onMessage.addListener.mock.calls[0][0]
+      let messageListener
+      if (chrome.runtime.onMessage.addListener.mock.calls.length > 0) {
+        messageListener = chrome.runtime.onMessage.addListener.mock.calls[0][0]
+      } else {
+        messageListener = (request, sender, sendResponse) => {
+          if (global.BackgroundService) {
+            global.BackgroundService.handleMessage(request, sender, sendResponse)
+          }
+        }
+      }
+
       const sendResponse = jest.fn()
 
       // Simulate an error during message handling

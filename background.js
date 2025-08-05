@@ -466,3 +466,8 @@ try {
 } catch (error) {
   console.error('[UWB Background] Failed to initialize background service:', error)
 }
+
+// Expose BackgroundService for testing
+if (typeof global !== 'undefined') {
+  global.BackgroundService = BackgroundService
+}
