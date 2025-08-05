@@ -8,7 +8,7 @@
 const fs = require('fs')
 const path = require('path')
 const archiver = require('archiver')
-const crypto = require('crypto')
+const { createHash } = require('crypto')
 
 // 🎯 Configuration
 const CONFIG = {
@@ -107,9 +107,9 @@ function generateChecksums(packagePath) {
   const fileBuffer = fs.readFileSync(packagePath)
 
   const checksums = {
-    md5: crypto.createHash('md5').update(fileBuffer).digest('hex'),
-    sha1: crypto.createHash('sha1').update(fileBuffer).digest('hex'),
-    sha256: crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    md5: createHash('md5').update(fileBuffer).digest('hex'),
+    sha1: createHash('sha1').update(fileBuffer).digest('hex'),
+    sha256: createHash('sha256').update(fileBuffer).digest('hex')
   }
 
   // Write checksums file
