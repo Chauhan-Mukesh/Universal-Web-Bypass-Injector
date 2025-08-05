@@ -1,366 +1,715 @@
 /**
- * @file Simple Popup Tests
- * @description Focused tests for popup functionality logic
+ * @file Popup Script Tests
+ * @description Comprehensive tests for the PopupController class
  */
 
-// Mock Chrome APIs
-global.chrome = {
-  runtime: {
-    sendMessage: jest.fn(),
-    getManifest: jest.fn(() => ({
-      version: '2.0.0',
-      name: 'Universal Web Bypass Injector'
-    })),
-    getURL: jest.fn((path) => `chrome-extension://test/${path}`),
-    lastError: null
-  },
-  tabs: {
-    query: jest.fn(),
-    create: jest.fn(),
-    reload: jest.fn()
-  }
-}
+/* global PopupController */
 
-describe('Popup Logic Tests', () => {
+describe('PopupController', () => {
+  let mockElements
+
   beforeEach(() => {
+    // Reset Chrome API mocks
     jest.clearAllMocks()
     delete chrome.runtime.lastError
-  })
 
-  test('should identify active URLs for extension', () => {
-    const isActiveUrl = (url) => {
-      if (!url) return false
-      try {
-        const parsedUrl = new URL(url)
-        return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
-      } catch {
-        return false
-      }
-    }
+    // Mock chrome.runtime.getURL
+    chrome.runtime.getURL = jest.fn((path) => `chrome-extension://test/${path}`)
 
-    expect(isActiveUrl('https://example.com')).toBe(true)
-    expect(isActiveUrl('http://test.org')).toBe(true)
-    expect(isActiveUrl('chrome://extensions')).toBe(false)
-    expect(isActiveUrl('about:blank')).toBe(false)
-    expect(isActiveUrl('chrome-extension://test')).toBe(false)
-    expect(isActiveUrl('')).toBe(false)
-    expect(isActiveUrl(null)).toBe(false)
-  })
+    // Mock window.close since popup.js calls it
+    global.window.close = jest.fn()
 
-  test('should extract hostname from URL', () => {
-    const extractHostname = (url) => {
-      try {
-        return new URL(url).hostname
-      } catch {
-        return null
-      }
-    }
-
-    expect(extractHostname('https://example.com/path?query=1')).toBe('example.com')
-    expect(extractHostname('http://sub.example.org')).toBe('sub.example.org')
-    expect(extractHostname('invalid-url')).toBeNull()
-    expect(extractHostname('')).toBeNull()
-  })
-
-  test('should send messages to background script', async() => {
-    chrome.runtime.sendMessage.mockImplementation((message, callback) => {
-      callback({ success: true, data: 'test' })
-    })
-
-    const sendMessage = (message) => {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else {
-            resolve(response)
-          }
-        })
-      })
-    }
-
-    const result = await sendMessage({ action: 'test' })
-    expect(result).toEqual({ success: true, data: 'test' })
-  })
-
-  test('should handle message errors', async() => {
-    chrome.runtime.sendMessage.mockImplementation((message, callback) => {
-      chrome.runtime.lastError = { message: 'Connection failed' }
-      callback(null)
-    })
-
-    const sendMessage = (message) => {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else {
-            resolve(response)
-          }
-        })
-      })
-    }
-
-    await expect(sendMessage({ action: 'test' }))
-      .rejects.toThrow('Connection failed')
-  })
-
-  test('should load current tab', async() => {
-    const mockTab = { id: 123, url: 'https://example.com', active: true }
-    
-    chrome.tabs.query.mockImplementation((query, callback) => {
-      callback([mockTab])
-    })
-
-    const getCurrentTab = () => {
-      return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else if (tabs.length === 0) {
-            resolve(null)
-          } else {
-            resolve(tabs[0])
-          }
-        })
-      })
-    }
-
-    const tab = await getCurrentTab()
-    expect(tab).toEqual(mockTab)
-  })
-
-  test('should handle empty tab list', async() => {
-    chrome.tabs.query.mockImplementation((query, callback) => {
-      callback([])
-    })
-
-    const getCurrentTab = () => {
-      return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message))
-          } else if (tabs.length === 0) {
-            resolve(null)
-          } else {
-            resolve(tabs[0])
-          }
-        })
-      })
-    }
-
-    const tab = await getCurrentTab()
-    expect(tab).toBeNull()
-  })
-
-  test('should toggle site status', async() => {
-    chrome.runtime.sendMessage.mockImplementation((message, callback) => {
-      if (message.action === 'toggleSite') {
-        callback({ success: true, enabled: false })
-      }
-    })
-
-    const toggleSiteStatus = async(hostname) => {
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: 'toggleSite',
-          hostname
-        }, resolve)
-      })
-    }
-
-    const result = await toggleSiteStatus('example.com')
-    expect(result).toEqual({ success: true, enabled: false })
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      action: 'toggleSite',
-      hostname: 'example.com'
-    }, expect.any(Function))
-  })
-
-  test('should execute bypass', async() => {
-    chrome.runtime.sendMessage.mockImplementation((message, callback) => {
-      if (message.action === 'executeBypass') {
-        callback({ success: true })
-      }
-    })
-
-    const executeBypass = async(tabId) => {
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: 'executeBypass',
-          tabId
-        }, resolve)
-      })
-    }
-
-    const result = await executeBypass(123)
-    expect(result).toEqual({ success: true })
-  })
-
-  test('should reload tab', () => {
-    chrome.tabs.reload.mockImplementation(() => {})
-    
-    const reloadTab = (tabId) => {
-      chrome.tabs.reload(tabId)
-    }
-
-    reloadTab(123)
-    expect(chrome.tabs.reload).toHaveBeenCalledWith(123)
-  })
-
-  test('should open help page', () => {
-    const openHelpPage = () => {
-      chrome.tabs.create({
-        url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
-      })
-    }
-
-    openHelpPage()
-    expect(chrome.tabs.create).toHaveBeenCalledWith({
-      url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
-    })
-  })
-
-  test('should open statistics page', () => {
-    const openStatisticsPage = () => {
-      chrome.tabs.create({
-        url: chrome.runtime.getURL('statistics.html')
-      })
-    }
-
-    openStatisticsPage()
-    expect(chrome.tabs.create).toHaveBeenCalledWith({
-      url: 'chrome-extension://test/statistics.html'
-    })
-  })
-
-  test('should format session time', () => {
-    const formatSessionTime = (startTime) => {
-      const minutes = Math.floor((Date.now() - startTime) / 60000)
-      return `${minutes}m`
-    }
-
-    const fiveMinutesAgo = Date.now() - 300000
-    expect(formatSessionTime(fiveMinutesAgo)).toBe('5m')
-  })
-
-  test('should handle keyboard shortcuts', () => {
-    const handleKeyboard = (event) => {
-      if (event.key === 'Escape') return 'close'
-      if (event.ctrlKey && event.key === 'r') return 'refresh'
-      if (event.ctrlKey && event.key === 'h') return 'help'
-      return null
-    }
-
-    expect(handleKeyboard({ key: 'Escape' })).toBe('close')
-    expect(handleKeyboard({ key: 'r', ctrlKey: true })).toBe('refresh')
-    expect(handleKeyboard({ key: 'h', ctrlKey: true })).toBe('help')
-    expect(handleKeyboard({ key: 'a' })).toBeNull()
-  })
-
-  test('should get version info', () => {
-    const getVersionInfo = () => {
-      const manifest = chrome.runtime.getManifest()
-      return {
-        version: manifest.version,
-        name: manifest.name
-      }
-    }
-
-    const info = getVersionInfo()
-    expect(info.version).toBe('2.0.0')
-    expect(info.name).toBe('Universal Web Bypass Injector')
-  })
-
-  describe('Site Status Logic', () => {
-    test('should update toggle state', () => {
-      const updateToggleState = (element, enabled) => {
-        if (!element) return
-        element.className = enabled ? 'toggle-switch active' : 'toggle-switch'
-        element.setAttribute('aria-checked', enabled.toString())
-      }
-
-      const mockElement = {
+    // Mock DOM elements
+    mockElements = {
+      currentUrl: { textContent: '', title: '' },
+      statusDot: { className: '', style: { backgroundColor: '' } },
+      statusText: { textContent: '' },
+      helpLink: { addEventListener: jest.fn() },
+      version: { textContent: '' },
+      statsContainer: { style: { display: '' }, innerHTML: '' },
+      errorContainer: { style: { display: '' }, textContent: '' },
+      refreshButton: { addEventListener: jest.fn(), textContent: '', disabled: false },
+      toggleButton: { addEventListener: jest.fn() },
+      siteToggle: { 
+        addEventListener: jest.fn(),
         className: '',
-        setAttribute: jest.fn()
-      }
+        setAttribute: jest.fn(),
+        style: { opacity: '' }
+      },
+      statsSummary: { 
+        addEventListener: jest.fn(),
+        style: { display: '' },
+        classList: { add: jest.fn() }
+      },
+      blockedCount: { textContent: '' },
+      sessionTime: { textContent: '' }
+    }
 
-      updateToggleState(mockElement, true)
-      expect(mockElement.className).toBe('toggle-switch active')
-      expect(mockElement.setAttribute).toHaveBeenCalledWith('aria-checked', 'true')
+    // Mock document methods
+    document.getElementById = jest.fn((id) => mockElements[id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())])
+    document.querySelector = jest.fn((selector) => {
+      if (selector === '.status-dot') return mockElements.statusDot
+      if (selector === '.status-indicator span') return mockElements.statusText
+      if (selector === '.footer') return mockElements.version
+      if (selector === '.container') return { classList: { add: jest.fn() }, insertBefore: jest.fn() }
+      return null
+    })
+    document.querySelectorAll = jest.fn((selector) => {
+      if (selector === '.feature-list li') return []
+      if (selector === '.stat-card') return []
+      if (selector === '.section') return []
+      return []
+    })
+    document.addEventListener = jest.fn()
+    document.createElement = jest.fn(() => ({
+      id: '',
+      className: '',
+      style: { cssText: '', display: '' },
+      textContent: ''
+    }))
 
-      updateToggleState(mockElement, false)
-      expect(mockElement.className).toBe('toggle-switch')
-      expect(mockElement.setAttribute).toHaveBeenCalledWith('aria-checked', 'false')
+    // Mock setTimeout for animations
+    global.setTimeout = jest.fn((fn, delay) => fn())
+
+    // Mock console
+    global.console = {
+      ...console,
+      log: jest.fn(),
+      error: jest.fn()
+    }
+
+    // Load the popup script
+    delete require.cache[require.resolve('../popup.js')]
+    require('../popup.js')
+  })
+
+  describe('Initialization', () => {
+    test('should cache DOM elements correctly', () => {
+      PopupController.cacheElements()
+
+      expect(PopupController.elements).toBeDefined()
+      expect(PopupController.elements.currentUrl).toBe(mockElements.currentUrl)
+      expect(PopupController.elements.statusDot).toBe(mockElements.statusDot)
+      expect(PopupController.elements.statusText).toBe(mockElements.statusText)
     })
 
-    test('should update status display', () => {
-      const updateStatusDisplay = (statusDot, statusText, isActive, isEnabled) => {
-        if (statusDot) {
-          statusDot.className = isActive ? 'status-dot active' : 'status-dot inactive'
+    test('should setup event listeners', () => {
+      PopupController.cacheElements()
+      PopupController.setupEventListeners()
+
+      expect(mockElements.helpLink.addEventListener).toHaveBeenCalled()
+      expect(mockElements.refreshButton.addEventListener).toHaveBeenCalled()
+      expect(mockElements.siteToggle.addEventListener).toHaveBeenCalled()
+      expect(document.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function))
+    })
+
+    test('should initialize successfully with valid data', async () => {
+      // Mock successful responses
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com', title: 'Example' }])
+      })
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'getTabInfo') {
+          callback({ totalBlocked: 5, bypassActive: true })
+        } else if (message.action === 'getSiteStatus') {
+          callback({ enabled: true })
+        } else if (message.action === 'getStats') {
+          callback({ blocked: 10, sessionStartTime: Date.now() })
         }
-        if (statusText) {
-          statusText.textContent = isActive
-            ? 'Active and protecting this page'
-            : isEnabled ? 'Inactive on this page' : 'Disabled for this site'
+      })
+
+      PopupController.cacheElements()
+      await PopupController.init()
+
+      expect(PopupController.currentTab).toBeDefined()
+      expect(PopupController.siteStatus.enabled).toBe(true)
+      expect(PopupController.stats.blocked).toBe(10)
+    })
+
+    test('should handle initialization errors gracefully', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        chrome.runtime.lastError = { message: 'Permission denied' }
+        callback([])
+      })
+
+      PopupController.cacheElements()
+      await PopupController.init()
+
+      expect(console.error).toHaveBeenCalled()
+    })
+  })
+
+  describe('Tab Management', () => {
+    test('should query active tab successfully', async () => {
+      const mockTab = { id: 123, url: 'https://example.com', title: 'Example' }
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([mockTab])
+      })
+
+      const tab = await PopupController.queryActiveTab()
+      expect(tab).toEqual([mockTab])
+      expect(chrome.tabs.query).toHaveBeenCalledWith(
+        { active: true, currentWindow: true },
+        expect.any(Function)
+      )
+    })
+
+    test('should handle query tab errors', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        chrome.runtime.lastError = { message: 'Permission denied' }
+        callback([])
+      })
+
+      await expect(PopupController.queryActiveTab()).rejects.toThrow('Permission denied')
+    })
+
+    test('should load current tab and stats', async () => {
+      const mockTab = { id: 123, url: 'https://example.com' }
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([mockTab])
+      })
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'getTabInfo') {
+          callback({ totalBlocked: 15, bypassActive: true })
         }
+      })
+
+      await PopupController.loadCurrentTab()
+
+      expect(PopupController.currentTab).toEqual(mockTab)
+      expect(PopupController.stats.blocked).toBe(15)
+    })
+
+    test('should handle empty tab list', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([])
+      })
+
+      PopupController.cacheElements()
+      await PopupController.loadCurrentTab()
+
+      expect(console.error).toHaveBeenCalled()
+    })
+  })
+
+  describe('Site Status Management', () => {
+    test('should load site status successfully', async () => {
+      PopupController.currentTab = { url: 'https://example.com/page' }
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'getSiteStatus') {
+          callback({ enabled: false })
+        }
+      })
+
+      await PopupController.loadSiteStatus()
+
+      expect(PopupController.siteStatus.hostname).toBe('example.com')
+      expect(PopupController.siteStatus.enabled).toBe(false)
+    })
+
+    test('should handle invalid URLs gracefully', async () => {
+      PopupController.currentTab = { url: 'invalid-url' }
+
+      await PopupController.loadSiteStatus()
+
+      expect(console.log).toHaveBeenCalled()
+    })
+
+    test('should toggle site status', async () => {
+      PopupController.siteStatus = { hostname: 'example.com', enabled: true }
+      PopupController.cacheElements()
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'setSiteStatus') {
+          callback({ success: true, enabled: false })
+        }
+      })
+
+      await PopupController.toggleSiteStatus()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'setSiteStatus',
+        hostname: 'example.com',
+        enabled: false
+      }, expect.any(Function))
+    })
+  })
+
+  describe('Statistics Management', () => {
+    test('should load statistics successfully', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'getStats') {
+          callback({ 
+            totalBlocked: 50,
+            sessionsActive: 1,
+            sessionStartTime: Date.now() - 300000
+          })
+        }
+      })
+
+      await PopupController.loadStatistics()
+
+      expect(PopupController.stats.totalBlocked).toBe(50)
+      expect(PopupController.stats.sessionsActive).toBe(1)
+    })
+  })
+
+  describe('Message Handling', () => {
+    test('should send messages successfully', async () => {
+      const testMessage = { action: 'test' }
+      const testResponse = { success: true }
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback(testResponse)
+      })
+
+      const response = await PopupController.sendMessage(testMessage)
+
+      expect(response).toEqual(testResponse)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(testMessage, expect.any(Function))
+    })
+
+    test('should handle message errors', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        chrome.runtime.lastError = { message: 'Connection failed' }
+        callback(null)
+      })
+
+      await expect(PopupController.sendMessage({ action: 'test' }))
+        .rejects.toThrow('Connection failed')
+    })
+
+    test('should handle send message exceptions', async () => {
+      chrome.runtime.sendMessage.mockImplementation(() => {
+        throw new Error('Extension context invalidated')
+      })
+
+      await expect(PopupController.sendMessage({ action: 'test' }))
+        .rejects.toThrow('Extension context invalidated')
+    })
+  })
+
+  describe('UI Updates', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { url: 'https://example.com', title: 'Example Site' }
+      PopupController.siteStatus = { enabled: true, hostname: 'example.com' }
+      PopupController.stats = {
+        blocked: 25,
+        active: true,
+        sessionStartTime: Date.now() - 180000,
+        totalBlocked: 100
       }
+    })
 
-      const mockDot = { className: '' }
-      const mockText = { textContent: '' }
+    test('should update URL display', () => {
+      PopupController.updateCurrentUrl()
 
-      updateStatusDisplay(mockDot, mockText, true, true)
-      expect(mockDot.className).toBe('status-dot active')
-      expect(mockText.textContent).toBe('Active and protecting this page')
+      expect(mockElements.currentUrl.textContent).toBe('example.com')
+    })
 
-      updateStatusDisplay(mockDot, mockText, false, true)
-      expect(mockDot.className).toBe('status-dot inactive')
-      expect(mockText.textContent).toBe('Inactive on this page')
+    test('should update status display for active site', () => {
+      PopupController.updateStatus()
 
-      updateStatusDisplay(mockDot, mockText, false, false)
-      expect(mockDot.className).toBe('status-dot inactive')
-      expect(mockText.textContent).toBe('Disabled for this site')
+      expect(mockElements.statusDot.className).toContain('active')
+      expect(mockElements.statusText.textContent).toContain('Active')
+    })
+
+    test('should update status display for disabled site', () => {
+      PopupController.siteStatus.enabled = false
+      PopupController.updateStatus()
+
+      expect(mockElements.statusDot.className).toContain('inactive')
+      expect(mockElements.statusText.textContent).toContain('Disabled')
+    })
+
+    test('should update toggle display', () => {
+      PopupController.updateSiteToggle()
+
+      expect(mockElements.siteToggle.className).toContain('active')
+      expect(mockElements.siteToggle.setAttribute).toHaveBeenCalledWith('aria-checked', 'true')
     })
 
     test('should update statistics display', () => {
-      const updateStatsDisplay = (elements, stats) => {
-        if (!elements.statsSummary) return
+      PopupController.updateStatistics()
 
-        const hasData = stats.totalBlocked > 0 || stats.sessionsActive > 0
-        elements.statsSummary.style.display = hasData ? 'block' : 'none'
-
-        if (hasData) {
-          if (elements.blockedCount) {
-            elements.blockedCount.textContent = stats.totalBlocked || stats.blocked || 0
-          }
-          if (elements.sessionTime) {
-            const minutes = Math.floor((Date.now() - stats.sessionStartTime) / 60000)
-            elements.sessionTime.textContent = `${minutes}m`
-          }
-        }
-      }
-
-      const mockElements = {
-        statsSummary: { style: { display: '' } },
-        blockedCount: { textContent: '' },
-        sessionTime: { textContent: '' }
-      }
-
-      const stats = {
-        totalBlocked: 25,
-        sessionsActive: 1,
-        sessionStartTime: Date.now() - 180000 // 3 minutes ago
-      }
-
-      updateStatsDisplay(mockElements, stats)
       expect(mockElements.statsSummary.style.display).toBe('block')
-      expect(mockElements.blockedCount.textContent).toBe(25)
-      expect(mockElements.sessionTime.textContent).toBe('3m')
+      // The actual PopupController uses totalBlocked or blocked, and converts to string
+      expect(mockElements.blockedCount.textContent).toBe(100)
+    })
 
-      // Test with no data
-      const emptyStats = { totalBlocked: 0, sessionsActive: 0 }
-      updateStatsDisplay(mockElements, emptyStats)
+    test('should hide stats when no data', () => {
+      PopupController.stats = { blocked: 0, totalBlocked: 0 }
+      PopupController.updateStatistics()
+
       expect(mockElements.statsSummary.style.display).toBe('none')
+    })
+
+    test('should update version display', () => {
+      chrome.runtime.getManifest.mockReturnValue({ version: '2.0.0' })
+      mockElements.version.textContent = 'Universal Web Bypass Injector v1.0.0'
+      
+      PopupController.updateVersion()
+
+      expect(mockElements.version.textContent).toContain('v2.0.0')
+    })
+  })
+
+  describe('User Actions', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { id: 123, url: 'https://example.com' }
+    })
+
+    test('should toggle bypass functionality', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.toggleBypass()
+
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'executeBypass',
+        tabId: 123
+      }, expect.any(Function))
+    })
+
+    test('should refresh current tab', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com' }])
+      })
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.refreshCurrentTab()
+
+      expect(mockElements.refreshButton.textContent).toBe('Refresh')
+      expect(mockElements.refreshButton.disabled).toBe(false)
+    })
+
+    test('should open help page', () => {
+      PopupController.openHelpPage()
+
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
+      })
+    })
+
+    test('should open statistics page', () => {      
+      PopupController.openStatisticsPage()
+
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'chrome-extension://test/statistics.html'
+      })
+      expect(window.close).toHaveBeenCalled()
+    })
+  })
+
+  describe('Keyboard Shortcuts', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { id: 123 }
+    })
+
+    test('should handle Escape key', () => {
+      const mockEvent = { key: 'Escape', preventDefault: jest.fn() }
+
+      PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(window.close).toHaveBeenCalled()
+    })
+
+    test('should handle Ctrl+R for refresh', async () => {
+      const mockEvent = { key: 'r', ctrlKey: true, preventDefault: jest.fn() }
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com' }])
+      })
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled()
+    })
+
+    test('should handle Ctrl+H for help', () => {
+      const mockEvent = { key: 'h', ctrlKey: true, preventDefault: jest.fn() }
+
+      PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled()
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
+      })
+    })
+
+    test('should ignore unhandled keys', () => {
+      const mockEvent = { key: 'a', preventDefault: jest.fn() }
+
+      PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Error Handling', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+    })
+
+    test('should show error messages', () => {
+      // Test that showError method executes without throwing
+      expect(() => {
+        PopupController.showError('Test error message')
+      }).not.toThrow()
+    })
+  })
+
+  describe('Utility Functions', () => {
+    test('should check if extension is active', () => {
+      PopupController.currentTab = { url: 'https://example.com' }
+      expect(PopupController.isExtensionActive()).toBe(true)
+
+      PopupController.currentTab = { url: 'chrome://extensions' }
+      expect(PopupController.isExtensionActive()).toBe(false)
+
+      PopupController.currentTab = { url: 'about:blank' }
+      expect(PopupController.isExtensionActive()).toBe(false)
+
+      PopupController.currentTab = null
+      expect(PopupController.isExtensionActive()).toBe(false)
+
+      PopupController.currentTab = { url: 'invalid-url' }
+      expect(PopupController.isExtensionActive()).toBe(false)
+    })
+  })
+
+  describe('UI Update Methods', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { url: 'https://example.com', title: 'Example Site' }
+      PopupController.siteStatus = { enabled: true, hostname: 'example.com' }
+      PopupController.stats = {
+        blocked: 25,
+        active: true,
+        sessionStartTime: Date.now() - 180000,
+        totalBlocked: 100
+      }
+    })
+
+    test('should update current URL display', () => {
+      PopupController.updateCurrentUrl()
+      expect(mockElements.currentUrl.textContent).toBe('example.com')
+      expect(mockElements.currentUrl.title).toBe('https://example.com')
+    })
+
+    test('should handle invalid URL in updateCurrentUrl', () => {
+      PopupController.currentTab = { url: 'invalid-url' }
+      PopupController.updateCurrentUrl()
+      expect(mockElements.currentUrl.textContent).toBe('Invalid URL')
+    })
+
+    test('should update status display', () => {
+      PopupController.updateStatus()
+      expect(mockElements.statusDot.className).toContain('active')
+      expect(mockElements.statusText.textContent).toContain('Active')
+    })
+
+    test('should update site toggle display', () => {
+      PopupController.updateSiteToggle()
+      expect(mockElements.siteToggle.className).toContain('active')
+      expect(mockElements.siteToggle.setAttribute).toHaveBeenCalledWith('aria-checked', 'true')
+    })
+
+    test('should update statistics display', () => {
+      PopupController.updateStatistics()
+      expect(mockElements.statsSummary.style.display).toBe('block')
+    })
+
+    test('should hide statistics when no data', () => {
+      PopupController.stats = { blocked: 0, sessionsActive: 0 }
+      PopupController.updateStatistics()
+      expect(mockElements.statsSummary.style.display).toBe('none')
+    })
+
+    test('should update version display', () => {
+      chrome.runtime.getManifest.mockReturnValue({ version: '2.0.0' })
+      mockElements.version.textContent = 'Universal Web Bypass Injector v1.0.0'
+      
+      PopupController.updateVersion()
+      expect(mockElements.version.textContent).toContain('v2.0.0')
+    })
+
+    test('should update stats display container', () => {
+      PopupController.updateStatsDisplay()
+      expect(mockElements.statsContainer.style.display).toBe('block')
+      expect(mockElements.statsContainer.innerHTML).toContain('25')
+    })
+
+    test('should add animations', () => {
+      const mockContainer = { classList: { add: jest.fn() } }
+      const mockFeatureItems = [
+        { classList: { add: jest.fn() } },
+        { classList: { add: jest.fn() } }
+      ]
+
+      document.querySelector = jest.fn((selector) => {
+        if (selector === '.container') return mockContainer
+        return null
+      })
+      document.querySelectorAll = jest.fn(() => mockFeatureItems)
+
+      PopupController.addAnimations()
+      expect(mockContainer.classList.add).toHaveBeenCalledWith('animate-slide-in')
+    })
+  })
+
+  describe('Message Display', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+    })
+
+    test('should show success message', () => {
+      const mockContainer = { insertBefore: jest.fn() }
+      document.querySelector = jest.fn(() => mockContainer)
+      document.createElement = jest.fn(() => ({
+        id: '',
+        style: { cssText: '', display: '' },
+        textContent: ''
+      }))
+
+      PopupController.showMessage('Test message', 'success')
+      expect(document.createElement).toHaveBeenCalledWith('div')
+    })
+
+    test('should show error message', () => {
+      // Test that showError method executes without throwing
+      expect(() => {
+        PopupController.showError('Test error')
+      }).not.toThrow()
+    })
+
+    test('should handle showError when no error container exists', () => {
+      PopupController.elements.errorContainer = null
+      const mockErrorContainer = {
+        id: '',
+        className: '',
+        style: { cssText: '', display: '' },
+        textContent: ''
+      }
+      document.createElement = jest.fn(() => mockErrorContainer)
+      document.body.insertBefore = jest.fn()
+
+      PopupController.showError('Test error')
+      expect(document.createElement).toHaveBeenCalledWith('div')
+    })
+  })
+
+  describe('Refresh Functionality', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { id: 123, url: 'https://example.com' }
+    })
+
+    test('should refresh current tab successfully', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com' }])
+      })
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.refreshCurrentTab()
+
+      expect(mockElements.refreshButton.textContent).toBe('Refresh')
+      expect(mockElements.refreshButton.disabled).toBe(false)
+    })
+
+    test('should handle refresh errors', async () => {
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        chrome.runtime.lastError = { message: 'Permission denied' }
+        callback([])
+      })
+
+      PopupController.cacheElements()
+      await PopupController.refreshCurrentTab()
+
+      expect(console.error).toHaveBeenCalled()
+      expect(mockElements.refreshButton.textContent).toBe('Refresh')
+      expect(mockElements.refreshButton.disabled).toBe(false)
+    })
+  })
+
+  describe('Keyboard Shortcuts', () => {
+    beforeEach(() => {
+      PopupController.cacheElements()
+      PopupController.currentTab = { id: 123 }
+    })
+
+    test('should handle Escape key to close window', () => {
+      const mockEvent = { key: 'Escape', preventDefault: jest.fn() }
+      const closeSpy = jest.spyOn(window, 'close').mockImplementation()
+
+      PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(closeSpy).toHaveBeenCalled()
+      closeSpy.mockRestore()
+    })
+
+    test('should handle Ctrl+R for refresh', async () => {
+      const mockEvent = { key: 'r', ctrlKey: true, preventDefault: jest.fn() }
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com' }])
+      })
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled()
+    })
+
+    test('should handle Ctrl+H for help', () => {
+      const mockEvent = { key: 'h', ctrlKey: true, preventDefault: jest.fn() }
+      const closeSpy = jest.spyOn(window, 'close').mockImplementation()
+
+      PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled()
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
+      })
+      expect(closeSpy).toHaveBeenCalled()
+      closeSpy.mockRestore()
+    })
+
+    test('should handle Meta+R for refresh on Mac', async () => {
+      const mockEvent = { key: 'r', metaKey: true, preventDefault: jest.fn() }
+      chrome.tabs.query.mockImplementation((query, callback) => {
+        callback([{ id: 123, url: 'https://example.com' }])
+      })
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ success: true })
+      })
+
+      await PopupController.handleKeyboardShortcuts(mockEvent)
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled()
+    })
+  })
+
+  describe('Cleanup', () => {
+    test('should destroy controller properly', () => {
+      PopupController.destroy()
+      expect(console.log).toHaveBeenCalledWith('[UWB Popup] Popup controller destroyed')
     })
   })
 })

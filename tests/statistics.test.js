@@ -1,251 +1,197 @@
 /**
  * @file Statistics Page Tests
- * @description Test suite for the statistics page functionality
+ * @description Comprehensive tests for the StatisticsController class
  */
 
-// Mock Chrome APIs
-global.chrome = {
-  runtime: {
-    sendMessage: jest.fn(),
-    getURL: jest.fn((path) => `chrome-extension://test/${path}`),
-    lastError: null
-  },
-  tabs: {
-    create: jest.fn()
-  }
-}
+/* global StatisticsController */
 
-// Mock DOM environment
-Object.defineProperty(global, 'URL', {
-  value: class URL {
-    constructor(url) {
-      this.href = url
-    }
-    
-    static createObjectURL() {
-      return 'blob:test'
-    }
-    
-    static revokeObjectURL() {
-      return true
-    }
-  }
-})
-
-global.Blob = class Blob {
-  constructor(parts, options) {
-    this.parts = parts
-    this.type = options?.type || ''
-  }
-}
-
-describe('Statistics Page Tests', () => {
-  let StatisticsController
+describe('StatisticsController', () => {
+  let mockElements
 
   beforeEach(() => {
-    // Reset DOM
-    document.body.innerHTML = `
-      <div id="loading-state">Loading...</div>
-      <div id="stats-content" style="display: none;">
-        <button id="refresh-btn">Refresh</button>
-        <button id="export-btn">Export</button>
-        <button id="reset-btn">Reset</button>
-        <span id="total-blocked">0</span>
-        <span id="today-blocked">0</span>
-        <span id="week-blocked">0</span>
-        <span id="active-tabs">0</span>
-        <span id="disabled-sites">0</span>
-        <span id="uptime">0m</span>
-        <div id="type-chart"></div>
-        <tbody id="sites-table"></tbody>
-        <tbody id="activity-table"></tbody>
-        <tbody id="disabled-sites-table"></tbody>
-      </div>
-    `
+    // Reset Chrome API mocks
+    jest.clearAllMocks()
+    delete chrome.runtime.lastError
 
-    // Mock StatisticsController
-    StatisticsController = {
-      data: null,
-      elements: {},
-      refreshInterval: null,
-      
-      cacheElements() {
-        this.elements = {
-          loadingState: document.getElementById('loading-state'),
-          statsContent: document.getElementById('stats-content'),
-          refreshBtn: document.getElementById('refresh-btn'),
-          exportBtn: document.getElementById('export-btn'),
-          resetBtn: document.getElementById('reset-btn'),
-          totalBlocked: document.getElementById('total-blocked'),
-          todayBlocked: document.getElementById('today-blocked'),
-          weekBlocked: document.getElementById('week-blocked'),
-          activeTabs: document.getElementById('active-tabs'),
-          disabledSites: document.getElementById('disabled-sites'),
-          uptime: document.getElementById('uptime'),
-          typeChart: document.getElementById('type-chart'),
-          sitesTable: document.getElementById('sites-table'),
-          activityTable: document.getElementById('activity-table'),
-          disabledSitesTable: document.getElementById('disabled-sites-table')
-        }
+    // Mock DOM elements
+    mockElements = {
+      loadingState: { style: { display: '' } },
+      statsContent: { style: { display: '' } },
+      refreshBtn: { 
+        addEventListener: jest.fn(),
+        textContent: '',
+        disabled: false
       },
-
-      sendMessage(message) {
-        return new Promise((resolve, reject) => {
-          try {
-            chrome.runtime.sendMessage(message, (response) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message))
-              } else {
-                resolve(response)
-              }
-            })
-          } catch (error) {
-            reject(error)
-          }
-        })
-      },
-
-      async loadStatistics() {
-        const response = await this.sendMessage({ action: 'getDetailedStats' })
-        if (response && !response.error) {
-          this.data = response
-          this.updateUI()
-          this.showContent()
-        } else {
-          throw new Error(response?.error || 'Failed to load statistics')
-        }
-      },
-
-      updateOverviewStats() {
-        if (this.elements.totalBlocked) {
-          this.elements.totalBlocked.textContent = this.formatNumber(this.data.total || 0)
-        }
-        if (this.elements.todayBlocked) {
-          this.elements.todayBlocked.textContent = this.formatNumber(this.data.today || 0)
-        }
-        if (this.elements.weekBlocked) {
-          this.elements.weekBlocked.textContent = this.formatNumber(this.data.week || 0)
-        }
-        if (this.elements.activeTabs) {
-          this.elements.activeTabs.textContent = this.data.activeTabs || 0
-        }
-        if (this.elements.disabledSites) {
-          this.elements.disabledSites.textContent = (this.data.disabledSites || []).length
-        }
-        if (this.elements.uptime) {
-          const uptimeMs = this.data.uptime || 0
-          const uptimeMinutes = Math.floor(uptimeMs / 60000)
-          this.elements.uptime.textContent = this.formatDuration(uptimeMinutes)
-        }
-      },
-
-      updateTypeChart() {
-        if (!this.elements.typeChart) return
-        const byType = this.data.byType || {}
-        const types = Object.entries(byType).sort(([,a], [,b]) => b - a)
-        
-        if (types.length === 0) {
-          this.elements.typeChart.innerHTML = '<div class="empty-state">No data</div>'
-          return
-        }
-
-        const maxValue = Math.max(...types.map(([,value]) => value))
-        this.elements.typeChart.innerHTML = types.map(([type, count]) => {
-          const percentage = maxValue > 0 ? (count / maxValue) * 100 : 0
-          return `<div class="bar-item" data-type="${type}" data-count="${count}" data-percentage="${percentage}"></div>`
-        }).join('')
-      },
-
-      updateUI() {
-        this.updateOverviewStats()
-        this.updateTypeChart()
-      },
-
-      showContent() {
-        if (this.elements.loadingState) {
-          this.elements.loadingState.style.display = 'none'
-        }
-        if (this.elements.statsContent) {
-          this.elements.statsContent.style.display = 'block'
-        }
-      },
-
-      async enableSite(hostname) {
-        const response = await this.sendMessage({
-          action: 'setSiteStatus',
-          hostname: hostname,
-          enabled: true
-        })
-        if (response && !response.error) {
-          await this.loadStatistics()
-        } else {
-          throw new Error(response?.error || 'Failed to enable site')
-        }
-      },
-
-      exportData() {
-        const dataStr = JSON.stringify(this.data, null, 2)
-        const dataBlob = new Blob([dataStr], { type: 'application/json' })
-        
-        const url = URL.createObjectURL(dataBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `uwb-statistics-${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-      },
-
-      formatNumber(num) {
-        return new Intl.NumberFormat().format(num)
-      },
-
-      formatDuration(minutes) {
-        if (minutes < 60) {
-          return `${minutes}m`
-        } else if (minutes < 1440) {
-          const hours = Math.floor(minutes / 60)
-          const mins = minutes % 60
-          return `${hours}h ${mins}m`
-        } else {
-          const days = Math.floor(minutes / 1440)
-          const hours = Math.floor((minutes % 1440) / 60)
-          return `${days}d ${hours}h`
-        }
-      },
-
-      capitalizeFirst(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1)
-      }
+      exportBtn: { addEventListener: jest.fn() },
+      resetBtn: { addEventListener: jest.fn() },
+      totalBlocked: { textContent: '' },
+      todayBlocked: { textContent: '' },
+      weekBlocked: { textContent: '' },
+      activeTabs: { textContent: '' },
+      disabledSites: { textContent: '' },
+      uptime: { textContent: '' },
+      typeChart: { innerHTML: '' },
+      sitesTable: { innerHTML: '' },
+      activityTable: { innerHTML: '' },
+      disabledSitesTable: { innerHTML: '' }
     }
 
-    // Cache elements
-    StatisticsController.cacheElements()
+    // Mock document methods
+    document.getElementById = jest.fn((id) => {
+      const camelCaseId = id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
+      return mockElements[camelCaseId] || null
+    })
+    document.querySelectorAll = jest.fn(() => [])
+    document.createElement = jest.fn(() => ({
+      href: '',
+      download: '',
+      click: jest.fn()
+    }))
+    
+    // Mock document.body methods without replacing body
+    jest.spyOn(document.body, 'appendChild').mockImplementation(jest.fn())
+    jest.spyOn(document.body, 'removeChild').mockImplementation(jest.fn())
+
+    // Mock console
+    global.console = {
+      ...console,
+      log: jest.fn(),
+      error: jest.fn()
+    }
+
+    // Mock global objects
+    global.URL = {
+      createObjectURL: jest.fn(() => 'blob:test'),
+      revokeObjectURL: jest.fn()
+    }
+    global.Blob = jest.fn()
+    global.setInterval = jest.fn(() => 123)
+    global.clearInterval = jest.fn()
+    global.confirm = jest.fn(() => true)
+    global.alert = jest.fn()
+
+    // Load the statistics script
+    delete require.cache[require.resolve('../statistics.js')]
+    require('../statistics.js')
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
   })
 
   describe('Initialization', () => {
     test('should cache DOM elements correctly', () => {
-      expect(StatisticsController.elements.loadingState).toBeTruthy()
-      expect(StatisticsController.elements.statsContent).toBeTruthy()
-      expect(StatisticsController.elements.totalBlocked).toBeTruthy()
-      expect(StatisticsController.elements.typeChart).toBeTruthy()
+      StatisticsController.cacheElements()
+
+      expect(StatisticsController.elements).toBeDefined()
+      expect(StatisticsController.elements.loadingState).toBe(mockElements.loadingState)
+      expect(StatisticsController.elements.totalBlocked).toBe(mockElements.totalBlocked)
+      expect(StatisticsController.elements.typeChart).toBe(mockElements.typeChart)
+    })
+
+    test('should setup event listeners', () => {
+      StatisticsController.cacheElements()
+      StatisticsController.setupEventListeners()
+
+      expect(mockElements.refreshBtn.addEventListener).toHaveBeenCalled()
+      expect(mockElements.exportBtn.addEventListener).toHaveBeenCalled()
+      expect(mockElements.resetBtn.addEventListener).toHaveBeenCalled()
+      expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Event listeners setup complete')
+    })
+
+    test('should initialize successfully with valid data', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'getDetailedStats') {
+          callback({
+            total: 100,
+            today: 25,
+            week: 75,
+            activeTabs: 2,
+            disabledSites: ['example.com'],
+            uptime: 3600000,
+            byType: { script: 50, image: 30 }
+          })
+        }
+      })
+
+      StatisticsController.cacheElements()
+      await StatisticsController.init()
+
+      expect(StatisticsController.data).toBeDefined()
+      expect(StatisticsController.data.total).toBe(100)
+    })
+
+    test('should handle initialization errors', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ error: 'Failed to load' })
+      })
+
+      StatisticsController.cacheElements()
+      await StatisticsController.init()
+
+      expect(console.error).toHaveBeenCalled()
+    })
+
+    test('should setup auto-refresh', () => {
+      StatisticsController.setupAutoRefresh()
+
+      expect(setInterval).toHaveBeenCalledWith(expect.any(Function), 30000)
+      expect(StatisticsController.refreshInterval).toBe(123)
+    })
+  })
+
+  describe('Message Handling', () => {
+    test('should send messages successfully', async () => {
+      const testMessage = { action: 'test' }
+      const testResponse = { success: true }
+
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback(testResponse)
+      })
+
+      const response = await StatisticsController.sendMessage(testMessage)
+
+      expect(response).toEqual(testResponse)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(testMessage, expect.any(Function))
+    })
+
+    test('should handle message errors', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        chrome.runtime.lastError = { message: 'Connection failed' }
+        callback(null)
+      })
+
+      await expect(StatisticsController.sendMessage({ action: 'test' }))
+        .rejects.toThrow('Connection failed')
+    })
+
+    test('should handle send message exceptions', async () => {
+      chrome.runtime.sendMessage.mockImplementation(() => {
+        throw new Error('Extension context invalidated')
+      })
+
+      await expect(StatisticsController.sendMessage({ action: 'test' }))
+        .rejects.toThrow('Extension context invalidated')
     })
   })
 
   describe('Statistics Loading', () => {
-    test('should load statistics successfully', async() => {
+    beforeEach(() => {
+      StatisticsController.cacheElements()
+    })
+
+    test('should load statistics successfully', async () => {
       const mockData = {
         total: 100,
         today: 25,
         week: 75,
         activeTabs: 3,
         disabledSites: ['example.com'],
-        uptime: 3600000, // 1 hour
+        uptime: 3600000,
         byType: { script: 50, image: 30, iframe: 20 }
       }
 
-      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback(mockData)
       })
 
@@ -256,17 +202,31 @@ describe('Statistics Page Tests', () => {
       expect(StatisticsController.elements.loadingState.style.display).toBe('none')
     })
 
-    test('should handle loading errors', async() => {
-      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+    test('should handle loading errors', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to load' })
       })
 
-      await expect(StatisticsController.loadStatistics()).rejects.toThrow('Failed to load')
+      await StatisticsController.loadStatistics()
+
+      expect(console.error).toHaveBeenCalled()
+      expect(alert).toHaveBeenCalledWith('Failed to load statistics data')
+    })
+
+    test('should handle null response', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback(null)
+      })
+
+      await StatisticsController.loadStatistics()
+
+      expect(console.error).toHaveBeenCalled()
     })
   })
 
   describe('UI Updates', () => {
     beforeEach(() => {
+      StatisticsController.cacheElements()
       StatisticsController.data = {
         total: 1234,
         today: 56,
@@ -274,7 +234,14 @@ describe('Statistics Page Tests', () => {
         activeTabs: 2,
         disabledSites: ['example.com', 'test.com'],
         uptime: 7260000, // 2 hours 1 minute
-        byType: { script: 800, image: 300, iframe: 134 }
+        byType: { script: 800, image: 300, iframe: 134 },
+        topSites: [
+          ['example.com', { blocked: 50, lastActivity: Date.now() }],
+          ['test.com', { blocked: 25, lastActivity: Date.now() - 86400000 }]
+        ],
+        recentBlocked: [
+          { timestamp: Date.now(), hostname: 'example.com', type: 'script', url: 'https://example.com/ad.js' }
+        ]
       }
     })
 
@@ -284,8 +251,8 @@ describe('Statistics Page Tests', () => {
       expect(StatisticsController.elements.totalBlocked.textContent).toBe('1,234')
       expect(StatisticsController.elements.todayBlocked.textContent).toBe('56')
       expect(StatisticsController.elements.weekBlocked.textContent).toBe('789')
-      expect(StatisticsController.elements.activeTabs.textContent).toBe('2')
-      expect(StatisticsController.elements.disabledSites.textContent).toBe('2')
+      expect(StatisticsController.elements.activeTabs.textContent).toBe(2)
+      expect(StatisticsController.elements.disabledSites.textContent).toBe(2)
       expect(StatisticsController.elements.uptime.textContent).toBe('2h 1m')
     })
 
@@ -293,33 +260,211 @@ describe('Statistics Page Tests', () => {
       StatisticsController.updateTypeChart()
 
       const chart = StatisticsController.elements.typeChart
-      expect(chart.innerHTML).toContain('script')
-      expect(chart.innerHTML).toContain('image')
-      expect(chart.innerHTML).toContain('iframe')
-      
-      const barItems = chart.querySelectorAll('.bar-item')
-      expect(barItems).toHaveLength(3)
+      expect(chart.innerHTML).toContain('Script')
+      expect(chart.innerHTML).toContain('Image')
+      expect(chart.innerHTML).toContain('Iframe')
+      expect(chart.innerHTML).toContain('800')
+      expect(chart.innerHTML).toContain('300')
+      expect(chart.innerHTML).toContain('134')
     })
 
     test('should handle empty type chart', () => {
       StatisticsController.data.byType = {}
       StatisticsController.updateTypeChart()
 
-      expect(StatisticsController.elements.typeChart.innerHTML).toContain('No data')
+      expect(StatisticsController.elements.typeChart.innerHTML).toContain('No blocked items by type yet')
+    })
+
+    test('should update sites table correctly', () => {
+      StatisticsController.updateSitesTable()
+
+      const table = StatisticsController.elements.sitesTable
+      expect(table.innerHTML).toContain('example.com')
+      expect(table.innerHTML).toContain('test.com')
+      expect(table.innerHTML).toContain('50')
+      expect(table.innerHTML).toContain('25')
+    })
+
+    test('should handle empty sites table', () => {
+      StatisticsController.data.topSites = []
+      StatisticsController.updateSitesTable()
+
+      expect(StatisticsController.elements.sitesTable.innerHTML).toContain('No sites with blocked content yet')
+    })
+
+    test('should update activity table correctly', () => {
+      StatisticsController.updateActivityTable()
+
+      const table = StatisticsController.elements.activityTable
+      expect(table.innerHTML).toContain('example.com')
+      expect(table.innerHTML).toContain('Script')
+      expect(table.innerHTML).toContain('https://example.com/ad.js')
+    })
+
+    test('should handle empty activity table', () => {
+      StatisticsController.data.recentBlocked = []
+      StatisticsController.updateActivityTable()
+
+      expect(StatisticsController.elements.activityTable.innerHTML).toContain('No recent activity')
+    })
+
+    test('should update disabled sites table correctly', () => {
+      StatisticsController.updateDisabledSitesTable()
+
+      const table = StatisticsController.elements.disabledSitesTable
+      expect(table.innerHTML).toContain('example.com')
+      expect(table.innerHTML).toContain('test.com')
+      expect(table.innerHTML).toContain('Disabled')
+      expect(table.innerHTML).toContain('Enable')
+    })
+
+    test('should handle empty disabled sites table', () => {
+      StatisticsController.data.disabledSites = []
+      StatisticsController.updateDisabledSitesTable()
+
+      expect(StatisticsController.elements.disabledSitesTable.innerHTML).toContain('No disabled sites')
+    })
+
+    test('should add animations', () => {
+      const mockStatCards = [
+        { classList: { add: jest.fn() } },
+        { classList: { add: jest.fn() } }
+      ]
+      const mockSections = [
+        { classList: { add: jest.fn() } }
+      ]
+
+      document.querySelectorAll = jest.fn((selector) => {
+        if (selector === '.stat-card') return mockStatCards
+        if (selector === '.section') return mockSections
+        return []
+      })
+
+      // Mock setTimeout as a jest function
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout')
+
+      StatisticsController.addAnimations()
+
+      // Check that setTimeout was called for animations
+      expect(setTimeoutSpy).toHaveBeenCalled()
+      
+      setTimeoutSpy.mockRestore()
+    })
+  })
+
+  describe('Data Management', () => {
+    beforeEach(() => {
+      StatisticsController.cacheElements()
+    })
+
+    test('should refresh data successfully', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ total: 200, today: 50 })
+      })
+
+      await StatisticsController.refreshData()
+
+      expect(mockElements.refreshBtn.textContent).toBe('🔄 Refresh Data')
+      expect(mockElements.refreshBtn.disabled).toBe(false)
+      expect(StatisticsController.data.total).toBe(200)
+    })
+
+    test('should handle refresh errors', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ error: 'Failed to refresh' })
+      })
+
+      await StatisticsController.refreshData()
+
+      expect(console.error).toHaveBeenCalled()
+      expect(alert).toHaveBeenCalledWith('Failed to load statistics data')
+      expect(mockElements.refreshBtn.disabled).toBe(false)
+    })
+
+    test('should export data correctly', () => {
+      StatisticsController.data = { total: 100, today: 10 }
+
+      const mockLink = {
+        href: '',
+        download: '',
+        click: jest.fn()
+      }
+      document.createElement.mockReturnValue(mockLink)
+
+      StatisticsController.exportData()
+
+      expect(Blob).toHaveBeenCalledWith([JSON.stringify(StatisticsController.data, null, 2)], { type: 'application/json' })
+      expect(URL.createObjectURL).toHaveBeenCalled()
+      expect(mockLink.download).toContain('uwb-statistics-')
+      expect(mockLink.download).toContain('.json')
+      expect(mockLink.click).toHaveBeenCalled()
+      expect(document.body.appendChild).toHaveBeenCalledWith(mockLink)
+      expect(document.body.removeChild).toHaveBeenCalledWith(mockLink)
+      expect(URL.revokeObjectURL).toHaveBeenCalled()
+    })
+
+    test('should handle export errors', () => {
+      StatisticsController.data = { total: 100 }
+      document.createElement.mockImplementation(() => {
+        throw new Error('Document error')
+      })
+
+      StatisticsController.exportData()
+
+      expect(console.error).toHaveBeenCalled()
+      expect(alert).toHaveBeenCalledWith('Failed to export data')
+    })
+
+    test('should reset statistics with confirmation', async () => {
+      confirm.mockReturnValue(true)
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        if (message.action === 'resetStats') {
+          callback({ success: true })
+        } else if (message.action === 'getDetailedStats') {
+          callback({ total: 0 })
+        }
+      })
+
+      await StatisticsController.resetStatistics()
+
+      expect(confirm).toHaveBeenCalledWith('Are you sure you want to reset all statistics? This action cannot be undone.')
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'resetStats' }, expect.any(Function))
+    })
+
+    test('should not reset statistics without confirmation', async () => {
+      confirm.mockReturnValue(false)
+
+      await StatisticsController.resetStatistics()
+
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ action: 'resetStats' }, expect.any(Function))
+    })
+
+    test('should handle reset errors', async () => {
+      confirm.mockReturnValue(true)
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
+        callback({ error: 'Failed to reset' })
+      })
+
+      await StatisticsController.resetStatistics()
+
+      expect(console.error).toHaveBeenCalled()
+      expect(alert).toHaveBeenCalledWith('Failed to reset statistics')
     })
   })
 
   describe('Site Management', () => {
-    test('should enable disabled site', async() => {
-      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+    beforeEach(() => {
+      StatisticsController.cacheElements()
+    })
+
+    test('should enable disabled site', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         if (message.action === 'setSiteStatus') {
           callback({ success: true })
         } else if (message.action === 'getDetailedStats') {
           callback({ total: 100 })
         }
       })
-
-      StatisticsController.data = { total: 100 }
 
       await StatisticsController.enableSite('example.com')
 
@@ -330,41 +475,15 @@ describe('Statistics Page Tests', () => {
       }, expect.any(Function))
     })
 
-    test('should handle enable site error', async() => {
-      chrome.runtime.sendMessage = jest.fn((message, callback) => {
+    test('should handle enable site error', async () => {
+      chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to enable' })
       })
 
-      await expect(StatisticsController.enableSite('example.com')).rejects.toThrow('Failed to enable')
-    })
-  })
+      await StatisticsController.enableSite('example.com')
 
-  describe('Data Export', () => {
-    test('should export data correctly', () => {
-      StatisticsController.data = { total: 100, today: 10 }
-
-      // Mock document.createElement and related methods
-      const mockLink = {
-        href: '',
-        download: '',
-        click: jest.fn()
-      }
-      const createElementSpy = jest.spyOn(document, 'createElement').mockReturnValue(mockLink)
-      const appendChildSpy = jest.spyOn(document.body, 'appendChild').mockImplementation()
-      const removeChildSpy = jest.spyOn(document.body, 'removeChild').mockImplementation()
-
-      StatisticsController.exportData()
-
-      expect(createElementSpy).toHaveBeenCalledWith('a')
-      expect(mockLink.download).toContain('uwb-statistics-')
-      expect(mockLink.download).toContain('.json')
-      expect(mockLink.click).toHaveBeenCalled()
-      expect(appendChildSpy).toHaveBeenCalledWith(mockLink)
-      expect(removeChildSpy).toHaveBeenCalledWith(mockLink)
-
-      createElementSpy.mockRestore()
-      appendChildSpy.mockRestore()
-      removeChildSpy.mockRestore()
+      expect(console.error).toHaveBeenCalled()
+      expect(alert).toHaveBeenCalledWith('Failed to enable example.com')
     })
   })
 
@@ -379,12 +498,49 @@ describe('Statistics Page Tests', () => {
       expect(StatisticsController.formatDuration(30)).toBe('30m')
       expect(StatisticsController.formatDuration(90)).toBe('1h 30m')
       expect(StatisticsController.formatDuration(1500)).toBe('1d 1h')
+      expect(StatisticsController.formatDuration(0)).toBe('0m')
     })
 
     test('should capitalize first letter', () => {
       expect(StatisticsController.capitalizeFirst('script')).toBe('Script')
       expect(StatisticsController.capitalizeFirst('image')).toBe('Image')
       expect(StatisticsController.capitalizeFirst('')).toBe('')
+      expect(StatisticsController.capitalizeFirst('a')).toBe('A')
+    })
+
+    test('should show error messages', () => {
+      StatisticsController.showError('Test error')
+
+      expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error:', 'Test error')
+      expect(alert).toHaveBeenCalledWith('Test error')
+    })
+
+    test('should show content correctly', () => {
+      StatisticsController.cacheElements()
+      StatisticsController.showContent()
+
+      expect(StatisticsController.elements.loadingState.style.display).toBe('none')
+      expect(StatisticsController.elements.statsContent.style.display).toBe('block')
+    })
+  })
+
+  describe('Cleanup', () => {
+    test('should destroy controller properly', () => {
+      StatisticsController.refreshInterval = 123
+
+      StatisticsController.destroy()
+
+      expect(clearInterval).toHaveBeenCalledWith(123)
+      expect(StatisticsController.refreshInterval).toBeNull()
+      expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Statistics controller destroyed')
+    })
+
+    test('should handle destroy with no interval', () => {
+      StatisticsController.refreshInterval = null
+
+      StatisticsController.destroy()
+
+      expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Statistics controller destroyed')
     })
   })
 })
