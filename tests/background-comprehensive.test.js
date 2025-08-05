@@ -79,7 +79,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
   });
 
   describe('Initialization Error Handling', () => {
-    test('should handle initialization errors gracefully', async () => {
+    test('should handle initialization errors gracefully', async() => {
       // Mock method to throw error
       const originalSetupEventListeners = BackgroundService.setupEventListeners;
       BackgroundService.setupEventListeners = jest.fn(() => {
@@ -94,7 +94,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
       BackgroundService.setupEventListeners = originalSetupEventListeners;
     });
 
-    test('should handle storage loading errors', async () => {
+    test('should handle storage loading errors', async() => {
       chrome.storage.sync.get.mockImplementationOnce(() => {
         throw new Error('Storage error');
       });
@@ -104,7 +104,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
       expect(console.error).toHaveBeenCalledWith('[UWB Background] Error loading storage data:', expect.any(Error));
     });
 
-    test('should handle storage saving errors', async () => {
+    test('should handle storage saving errors', async() => {
       chrome.storage.sync.set.mockImplementationOnce(() => {
         throw new Error('Storage save error');
       });
@@ -224,7 +224,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
       BackgroundService.activeTabs.get = originalGet;
     });
 
-    test('should handle setSiteStatus errors', async () => {
+    test('should handle setSiteStatus errors', async() => {
       // Mock saveStorageData to throw error
       const originalSaveStorageData = BackgroundService.saveStorageData;
       BackgroundService.saveStorageData = jest.fn().mockRejectedValue(new Error('Save failed'));
@@ -353,7 +353,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
       expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
     });
 
-    test('should handle script execution failure', async () => {
+    test('should handle script execution failure', async() => {
       chrome.scripting.executeScript.mockRejectedValueOnce(new Error('Script error'));
 
       const tabId = 123;
@@ -604,7 +604,7 @@ describe('BackgroundService Comprehensive Coverage', () => {
   });
 
   describe('Additional Coverage Tests', () => {
-    test('should handle storage data loading with existing data', async () => {
+    test('should handle storage data loading with existing data', async() => {
       const testData = {
         disabledSites: ['example.com', 'test.com'],
         statistics: { totalBlocked: 50 }

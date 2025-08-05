@@ -3,6 +3,9 @@
  * @description Comprehensive tests for popup functionality
  */
 
+// Mock DOM APIs
+const { JSDOM } = require('jsdom');
+
 describe('PopupController Tests', () => {
   let originalDocument, originalWindow, originalChrome
 
@@ -14,24 +17,42 @@ describe('PopupController Tests', () => {
     originalWindow = global.window
     originalChrome = global.chrome
 
-    // Setup DOM with all required elements
-    global.document = {
-      getElementById: jest.fn((_id) => ({
-        textContent: '',
-        innerHTML: '',
-        addEventListener: jest.fn(),
-        style: { display: 'none' },
-        click: jest.fn()
-      })),
-      querySelector: jest.fn(() => ({
-        textContent: '',
-        addEventListener: jest.fn()
-      })),
-      body: { innerHTML: '' }
-    }
+    // Create a new DOM environment for each test like other working tests
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>
+      <div id="current-url"></div>
+      <div id="toggle-status"></div>
+      <div id="blocked-count"></div>
+      <div id="session-info"></div>
+      <div id="version-info"></div>
+      <div id="stats-summary"></div>
+      <div id="error-container"></div>
+      <button id="toggle-button">Toggle</button>
+      <button id="statistics-button">Statistics</button>
+      <button id="help-button">Help</button>
+    </body></html>`, {
+      url: 'chrome-extension://test/popup.html',
+      pretendToBeVisual: true,
+      resources: 'usable'
+    });
 
-    global.window = {
-      location: { href: 'chrome-extension://test/popup.html' }
+    // Setup global objects
+    global.window = dom.window;
+    global.document = dom.window.document;
+
+    // Ensure location is properly configured for JSDOM
+    if (!global.window.location || global.window.location._location === null) {
+      Object.defineProperty(global.window, 'location', {
+        value: {
+          href: 'chrome-extension://test/popup.html',
+          protocol: 'chrome-extension:',
+          host: 'test',
+          hostname: 'test',
+          search: '',
+          pathname: '/popup.html'
+        },
+        writable: true,
+        configurable: true
+      });
     }
 
     // Mock chrome APIs
@@ -68,9 +89,30 @@ describe('PopupController Tests', () => {
       }
     }
 
-    // Clear require cache and load popup
+    // Clear require cache and load popup (with error handling for JSDOM location issue)
     delete require.cache[require.resolve('../popup.js')]
-    require('../popup.js')
+    try {
+      require('../popup.js')
+    } catch (error) {
+      if (error.message.includes('_location')) {
+        // JSDOM location issue - setup location manually then retry
+        Object.defineProperty(global.window, 'location', {
+          value: {
+            href: 'chrome-extension://test/popup.html',
+            protocol: 'chrome-extension:',
+            host: 'test',
+            hostname: 'test',
+            search: '',
+            pathname: '/popup.html'
+          },
+          writable: true,
+          configurable: true
+        });
+        require('../popup.js')
+      } else {
+        throw error
+      }
+    }
   })
 
   afterEach(() => {
@@ -246,13 +288,13 @@ describe('PopupController Tests', () => {
     })
 
     // Additional comprehensive tests for 90% coverage
-    test('should handle loadCurrentTab errors', async () => {
+    test('should handle loadCurrentTab errors', async() => {
       const originalQuery = chrome.tabs.query
       chrome.tabs.query = jest.fn((query, callback) => {
         if (callback) callback([]) // Empty tabs array
       })
 
-      const mockLoadCurrentTab = jest.fn().mockImplementation(async () => {
+      const mockLoadCurrentTab = jest.fn().mockImplementation(async() => {
         const tabs = await new Promise((resolve) => {
           chrome.tabs.query({ active: true, currentWindow: true }, resolve)
         })
@@ -270,7 +312,7 @@ describe('PopupController Tests', () => {
       chrome.tabs.query = originalQuery
     })
 
-    test('should handle sendMessage errors', async () => {
+    test('should handle sendMessage errors', async() => {
       const originalSendMessage = chrome.runtime.sendMessage
       chrome.runtime.lastError = { message: 'Extension context invalidated' }
       chrome.runtime.sendMessage = jest.fn((message, callback) => {
@@ -318,7 +360,7 @@ describe('PopupController Tests', () => {
           } else {
             elements.currentUrl.textContent = 'No active tab'
           }
-        } catch (error) {
+        } catch (_error) {
           elements.currentUrl.textContent = 'Invalid URL'
         }
         
@@ -348,7 +390,7 @@ describe('PopupController Tests', () => {
           } else {
             elements.currentUrl.textContent = 'No active tab'
           }
-        } catch (error) {
+        } catch (_error) {
           elements.currentUrl.textContent = 'Invalid URL'
         }
         
@@ -384,8 +426,8 @@ describe('PopupController Tests', () => {
       expect(mockIsExtensionActive(null)).toBe(false)
     })
 
-    test('should handle site status toggle with reload', async () => {
-      const mockToggleSiteStatus = jest.fn().mockImplementation(async () => {
+    test('should handle site status toggle with reload', async() => {
+      const mockToggleSiteStatus = jest.fn().mockImplementation(async() => {
         const siteStatus = { hostname: 'example.com', enabled: true }
         const currentTab = { id: 123 }
         const elements = { siteToggle: { style: { opacity: '1' } } }
@@ -448,8 +490,8 @@ describe('PopupController Tests', () => {
       expect(mockHandleKeyboardShortcuts(escapeEvent)).toBe('close')
     })
 
-    test('should handle tab stats loading', async () => {
-      const mockLoadTabStats = jest.fn().mockImplementation(async () => {
+    test('should handle tab stats loading', async() => {
+      const mockLoadTabStats = jest.fn().mockImplementation(async() => {
         const currentTab = { id: 123 }
         
         if (!currentTab || !currentTab.id) return null
@@ -498,7 +540,7 @@ describe('PopupController Tests', () => {
           const versionText = elements.version.textContent
           elements.version.textContent = versionText.replace('v1.0.0', `v${manifest.version}`)
           return elements.version.textContent
-        } catch (error) {
+        } catch (_error) {
           return 'Version update failed'
         }
       })
@@ -536,7 +578,7 @@ describe('PopupController Tests', () => {
             elements.statsSummary.style.display = 'none'
             return 'hidden'
           }
-        } catch (error) {
+        } catch (_error) {
           return 'error'
         }
       })
@@ -558,7 +600,7 @@ describe('PopupController Tests', () => {
           errorContainer.textContent = message
           errorContainer.style.display = 'block'
           return true
-        } catch (error) {
+        } catch (_error) {
           return false
         }
       })
@@ -604,7 +646,7 @@ describe('PopupController Tests', () => {
           })
           global.window.close()
           return true
-        } catch (error) {
+        } catch (_error) {
           return false
         }
       })
@@ -616,7 +658,7 @@ describe('PopupController Tests', () => {
           })
           global.window.close()
           return true
-        } catch (error) {
+        } catch (_error) {
           return false
         }
       })
