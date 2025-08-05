@@ -19,8 +19,8 @@ module.exports = [
         UniversalBypass: 'readonly',
         // Add test globals
         Chart: 'readonly',
-        // Add structuredClone conditionally for Node.js 17+
-        ...(typeof structuredClone !== 'undefined' ? { structuredClone: 'readonly' } : {})
+        // Add structuredClone for Node.js 17+ environments
+        structuredClone: 'readonly'
       }
     },
     rules: {

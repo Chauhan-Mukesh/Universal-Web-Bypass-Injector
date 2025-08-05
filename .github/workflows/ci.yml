@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   CACHE_VERSION: 'v1'
 
 jobs:
@@ -73,10 +73,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: ['16', '18', '20']
+        node-version: ['18', '20', '22']
         include:
           - os: ubuntu-latest
-            node-version: '18'
+            node-version: '20'
             coverage: true
     
     steps:
