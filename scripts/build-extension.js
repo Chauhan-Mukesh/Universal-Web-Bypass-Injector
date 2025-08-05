@@ -85,14 +85,16 @@ function processManifest() {
     manifest.description += ' [Staging Build]'
   }
 
-  // Add build info (in development only)
-  if (CONFIG.environment !== 'production') {
-    manifest.build_info = {
-      environment: CONFIG.environment,
-      timestamp: CONFIG.timestamp,
-      version: CONFIG.version
-    }
+  // Add build info to build report only (not to manifest)
+  const buildInfo = {
+    environment: CONFIG.environment,
+    timestamp: CONFIG.timestamp,
+    version: CONFIG.version
   }
+
+  // Store build info separately for internal use
+  const buildInfoPath = path.join(CONFIG.buildDir, 'build-info.json')
+  fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2))
 
   // Write processed manifest
   const outputPath = path.join(CONFIG.buildDir, 'manifest.json')

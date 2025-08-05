@@ -322,7 +322,7 @@ const PopupController = {
       }
 
       return protocol === 'http:' || protocol === 'https:'
-    } catch (error) {
+    } catch (_error) {
       return false
     }
   },

@@ -203,7 +203,7 @@
             // Silently handle errors (extension context might not be available)
           })
         }
-      } catch (error) {
+      } catch (_error) {
         // Silently handle chrome API errors
       }
     },
@@ -279,7 +279,7 @@
         // Patch window.fetch
         if (window.fetch && !window.fetch._bypassed) {
           const originalFetch = window.fetch
-          window.fetch = (resource, init) => {
+          window.fetch = (resource, _init) => {
             const url = (resource && typeof resource === 'object') ? resource.url : resource
 
             if (this._isBlocked(url)) {
@@ -427,7 +427,7 @@
                 this._log(`Removed high z-index overlay: ${element.tagName}, z-index: ${zIndex}`)
                 this._removeElement(element)
               }
-            } catch (error) {
+            } catch (_error) {
               // Silently continue on style computation errors
             }
           })
