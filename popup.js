@@ -20,12 +20,23 @@ const PopupController = {
   currentTab: null,
 
   /**
+   * Current site status
+   * @type {Object}
+   */
+  siteStatus: {
+    enabled: true,
+    hostname: null
+  },
+
+  /**
    * Extension statistics.
    * @type {Object}
    */
   stats: {
     blocked: 0,
-    active: false
+    active: false,
+    sessionStartTime: Date.now(),
+    sitesDisabled: []
   },
 
   /**
@@ -43,6 +54,8 @@ const PopupController = {
       this.cacheElements()
       this.setupEventListeners()
       await this.loadCurrentTab()
+      await this.loadSiteStatus()
+      await this.loadStatistics()
       this.updateUI()
       console.log('[UWB Popup] Initialized successfully')
     } catch (error) {
@@ -65,7 +78,11 @@ const PopupController = {
       statsContainer: document.getElementById('stats-container'),
       errorContainer: document.getElementById('error-container'),
       refreshButton: document.getElementById('refresh-button'),
-      toggleButton: document.getElementById('toggle-button')
+      toggleButton: document.getElementById('toggle-button'),
+      siteToggle: document.getElementById('site-toggle'),
+      statsSummary: document.getElementById('stats-summary'),
+      blockedCount: document.getElementById('blocked-count'),
+      sessionTime: document.getElementById('session-time')
     }
   },
 
@@ -94,6 +111,36 @@ const PopupController = {
       if (this.elements.toggleButton) {
         this.elements.toggleButton.addEventListener('click', () => {
           this.toggleBypass()
+        })
+      }
+
+      // Site toggle
+      if (this.elements.siteToggle) {
+        this.elements.siteToggle.addEventListener('click', () => {
+          this.toggleSiteStatus()
+        })
+        
+        // Keyboard support for toggle
+        this.elements.siteToggle.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            this.toggleSiteStatus()
+          }
+        })
+      }
+
+      // Statistics summary
+      if (this.elements.statsSummary) {
+        this.elements.statsSummary.addEventListener('click', () => {
+          this.openStatisticsPage()
+        })
+        
+        // Keyboard support for stats
+        this.elements.statsSummary.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            this.openStatisticsPage()
+          }
         })
       }
 
@@ -168,12 +215,61 @@ const PopupController = {
         this.stats = {
           blocked: response.totalBlocked || 0,
           active: response.bypassActive || true,
-          lastActivity: response.lastActivity
+          lastActivity: response.lastActivity,
+          sessionStartTime: response.sessionStartTime || Date.now()
         }
       }
     } catch (error) {
       console.log('[UWB Popup] Could not load tab stats:', error.message)
       // Don't show error to user for stats loading failures
+    }
+  },
+
+  /**
+   * Loads the site status (enabled/disabled) for the current hostname.
+   * @private
+   * @returns {Promise<void>}
+   */
+  async loadSiteStatus() {
+    try {
+      if (!this.currentTab || !this.currentTab.url) return
+
+      const url = new URL(this.currentTab.url)
+      const hostname = url.hostname
+      this.siteStatus.hostname = hostname
+
+      const response = await this.sendMessage({
+        action: 'getSiteStatus',
+        hostname: hostname
+      })
+
+      if (response && !response.error) {
+        this.siteStatus.enabled = response.enabled !== false
+      }
+    } catch (error) {
+      console.log('[UWB Popup] Could not load site status:', error.message)
+    }
+  },
+
+  /**
+   * Loads extension statistics.
+   * @private
+   * @returns {Promise<void>}
+   */
+  async loadStatistics() {
+    try {
+      const response = await this.sendMessage({
+        action: 'getStats'
+      })
+
+      if (response && !response.error) {
+        this.stats = {
+          ...this.stats,
+          ...response
+        }
+      }
+    } catch (error) {
+      console.log('[UWB Popup] Could not load statistics:', error.message)
     }
   },
 
@@ -207,7 +303,10 @@ const PopupController = {
     try {
       this.updateCurrentUrl()
       this.updateStatus()
+      this.updateSiteToggle()
+      this.updateStatistics()
       this.updateVersion()
+      this.addAnimations()
     } catch (error) {
       console.error('[UWB Popup] Error updating UI:', error)
     }
@@ -242,22 +341,92 @@ const PopupController = {
    */
   updateStatus() {
     try {
-      const isActive = this.isExtensionActive()
+      const isActive = this.isExtensionActive() && this.siteStatus.enabled
 
       if (this.elements.statusDot) {
         this.elements.statusDot.style.backgroundColor = isActive ? '#48bb78' : '#e53e3e'
+        this.elements.statusDot.className = isActive ? 'status-dot active' : 'status-dot inactive'
       }
 
       if (this.elements.statusText) {
         this.elements.statusText.textContent = isActive
           ? 'Active and protecting this page'
-          : 'Inactive on this page'
+          : this.siteStatus.enabled ? 'Inactive on this page' : 'Disabled for this site'
       }
 
       // Update stats if container exists
       this.updateStatsDisplay()
     } catch (error) {
       console.error('[UWB Popup] Error updating status:', error)
+    }
+  },
+
+  /**
+   * Updates the site toggle switch display.
+   * @private
+   */
+  updateSiteToggle() {
+    try {
+      if (!this.elements.siteToggle) return
+
+      const isEnabled = this.siteStatus.enabled
+      this.elements.siteToggle.className = isEnabled ? 'toggle-switch active' : 'toggle-switch'
+      this.elements.siteToggle.setAttribute('aria-checked', isEnabled.toString())
+    } catch (error) {
+      console.error('[UWB Popup] Error updating site toggle:', error)
+    }
+  },
+
+  /**
+   * Updates the statistics display.
+   * @private
+   */
+  updateStatistics() {
+    try {
+      if (!this.elements.statsSummary) return
+
+      // Show statistics if we have meaningful data
+      if (this.stats.blocked > 0 || this.stats.sessionsActive > 0) {
+        this.elements.statsSummary.style.display = 'block'
+        this.elements.statsSummary.classList.add('animate-fade-in')
+
+        if (this.elements.blockedCount) {
+          this.elements.blockedCount.textContent = this.stats.totalBlocked || this.stats.blocked || 0
+        }
+
+        if (this.elements.sessionTime) {
+          const sessionMinutes = Math.floor((Date.now() - this.stats.sessionStartTime) / 60000)
+          this.elements.sessionTime.textContent = `${sessionMinutes}m`
+        }
+      } else {
+        this.elements.statsSummary.style.display = 'none'
+      }
+    } catch (error) {
+      console.error('[UWB Popup] Error updating statistics:', error)
+    }
+  },
+
+  /**
+   * Adds animations to UI elements.
+   * @private
+   */
+  addAnimations() {
+    try {
+      // Add slide-in animation to main container
+      const container = document.querySelector('.container')
+      if (container) {
+        container.classList.add('animate-slide-in')
+      }
+
+      // Add staggered animations to feature list items
+      const featureItems = document.querySelectorAll('.feature-list li')
+      featureItems.forEach((item, index) => {
+        setTimeout(() => {
+          item.classList.add('animate-fade-in')
+        }, index * 100)
+      })
+    } catch (error) {
+      console.error('[UWB Popup] Error adding animations:', error)
     }
   },
 
@@ -344,6 +513,121 @@ const PopupController = {
   },
 
   /**
+   * Toggles the site status (enabled/disabled) for the current hostname.
+   * @private
+   */
+  async toggleSiteStatus() {
+    try {
+      if (!this.siteStatus.hostname) {
+        this.showError('No valid site to toggle')
+        return
+      }
+
+      const newStatus = !this.siteStatus.enabled
+      
+      // Add visual feedback
+      if (this.elements.siteToggle) {
+        this.elements.siteToggle.style.opacity = '0.6'
+      }
+
+      const response = await this.sendMessage({
+        action: 'setSiteStatus',
+        hostname: this.siteStatus.hostname,
+        enabled: newStatus
+      })
+
+      if (response && !response.error) {
+        this.siteStatus.enabled = newStatus
+        this.updateUI()
+        
+        // Show feedback message
+        const message = newStatus 
+          ? `Extension enabled for ${this.siteStatus.hostname}`
+          : `Extension disabled for ${this.siteStatus.hostname}`
+        
+        this.showMessage(message, 'success')
+        
+        // Refresh page if disabled
+        if (!newStatus && this.currentTab && this.currentTab.id) {
+          setTimeout(() => {
+            chrome.tabs.reload(this.currentTab.id)
+          }, 1000)
+        }
+      } else {
+        throw new Error(response?.error || 'Failed to toggle site status')
+      }
+    } catch (error) {
+      console.error('[UWB Popup] Error toggling site status:', error)
+      this.showError('Failed to toggle site status')
+    } finally {
+      // Restore visual feedback
+      if (this.elements.siteToggle) {
+        this.elements.siteToggle.style.opacity = '1'
+      }
+    }
+  },
+
+  /**
+   * Opens the detailed statistics page.
+   * @private
+   */
+  openStatisticsPage() {
+    try {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('statistics.html')
+      })
+      window.close() // Close popup after opening statistics
+    } catch (error) {
+      console.error('[UWB Popup] Error opening statistics page:', error)
+      this.showError('Could not open statistics page')
+    }
+  },
+
+  /**
+   * Shows a success message to the user.
+   * @param {string} message - Message to display.
+   * @param {string} type - Message type ('success', 'info', 'warning').
+   * @private
+   */
+  showMessage(message, type = 'info') {
+    try {
+      let messageContainer = document.getElementById('message-container')
+
+      if (!messageContainer) {
+        messageContainer = document.createElement('div')
+        messageContainer.id = 'message-container'
+        messageContainer.style.cssText = `
+          background: ${type === 'success' ? '#d4edda' : '#d1ecf1'};
+          border: 1px solid ${type === 'success' ? '#c3e6cb' : '#bee5eb'};
+          color: ${type === 'success' ? '#155724' : '#0c5460'};
+          border-radius: 4px;
+          padding: 8px;
+          margin: 8px 0;
+          font-size: 12px;
+          display: none;
+        `
+
+        const container = document.querySelector('.container')
+        if (container) {
+          container.insertBefore(messageContainer, container.firstChild)
+        }
+      }
+
+      messageContainer.textContent = message
+      messageContainer.style.display = 'block'
+
+      // Auto-hide message after 3 seconds
+      setTimeout(() => {
+        if (messageContainer.style.display === 'block') {
+          messageContainer.style.display = 'none'
+        }
+      }, 3000)
+    } catch (error) {
+      console.error('[UWB Popup] Error showing message:', error)
+    }
+  },
+
+  /**
    * Refreshes the current tab information.
    * @private
    */
@@ -355,6 +639,8 @@ const PopupController = {
       }
 
       await this.loadCurrentTab()
+      await this.loadSiteStatus()
+      await this.loadStatistics()
       this.updateUI()
 
       if (this.elements.refreshButton) {

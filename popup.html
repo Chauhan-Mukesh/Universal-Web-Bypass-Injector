@@ -146,8 +146,61 @@
 
     .controls {
       display: flex;
-      gap: 8px;
+      flex-direction: column;
+      gap: 12px;
       margin-bottom: 16px;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #2d3748;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #cbd5e0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: #48bb78;
+    }
+
+    .toggle-switch::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch.active::before {
+      transform: translateX(20px);
+    }
+
+    .button-controls {
+      display: flex;
+      gap: 8px;
     }
 
     .btn {
@@ -158,8 +211,9 @@
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s ease;
       text-align: center;
+      transform: translateY(0);
     }
 
     .btn-primary {
@@ -169,6 +223,8 @@
 
     .btn-primary:hover {
       background: #3182ce;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
     }
 
     .btn-secondary {
@@ -178,11 +234,92 @@
 
     .btn-secondary:hover {
       background: #cbd5e0;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(203, 213, 224, 0.4);
     }
 
     .btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
+    }
+
+    .stats-summary {
+      background: #f0fff4;
+      border: 1px solid #9ae6b4;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .stats-summary:hover {
+      background: #e6fffa;
+      border-color: #68d391;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(72, 187, 120, 0.2);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 6px;
+      border: 1px solid rgba(154, 230, 180, 0.5);
+    }
+
+    .stat-number {
+      font-size: 18px;
+      font-weight: 700;
+      color: #22543d;
+      display: block;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #2f855a;
+      font-weight: 500;
+    }
+
+    .view-details {
+      text-align: center;
+      font-size: 12px;
+      color: #2f855a;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    /* Animation classes */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .animate-slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out;
     }
     
     .footer {
@@ -271,12 +408,22 @@
     </div>
 
     <div class="controls">
-      <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information" aria-label="Refresh current tab information">
-        🔄 Refresh
-      </button>
-      <button id="toggle-button" class="btn btn-primary" title="Re-apply bypass for this page" aria-label="Re-apply bypass rules">
-        ⚡ Re-apply
-      </button>
+      <!-- Site Toggle Control -->
+      <div class="toggle-container">
+        <div class="toggle-label">Enable for this site</div>
+        <div class="toggle-switch active" id="site-toggle" role="switch" aria-checked="true" tabindex="0">
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="button-controls">
+        <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information" aria-label="Refresh current tab information">
+          🔄 Refresh
+        </button>
+        <button id="toggle-button" class="btn btn-primary" title="Re-apply bypass for this page" aria-label="Re-apply bypass rules">
+          ⚡ Re-apply
+        </button>
+      </div>
     </div>
     
     <div class="features">
@@ -292,6 +439,23 @@
       
       <div class="current-site">
         <strong>Current site:</strong> <span id="current-url">Loading...</span>
+      </div>
+
+      <!-- Statistics Summary -->
+      <div class="stats-summary" id="stats-summary" style="display: none;" role="button" tabindex="0" aria-label="View detailed statistics">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-number" id="blocked-count">0</span>
+            <span class="stat-label">Blocked</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number" id="session-time">0m</span>
+            <span class="stat-label">Session</span>
+          </div>
+        </div>
+        <div class="view-details">
+          📊 Click to view detailed statistics
+        </div>
       </div>
     </div>
     

@@ -68,6 +68,19 @@ global.chrome = {
   },
   notifications: {
     create: jest.fn()
+  },
+  storage: {
+    sync: {
+      get: jest.fn((keys, callback) => {
+        const result = {}
+        if (callback) callback(result)
+        return Promise.resolve(result)
+      }),
+      set: jest.fn((data, callback) => {
+        if (callback) callback()
+        return Promise.resolve()
+      })
+    }
   }
 }
 

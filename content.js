@@ -172,6 +172,15 @@
       }
 
       try {
+        // Check if extension is enabled for this site
+        const hostname = window.location.hostname
+        const isEnabled = await this._checkSiteEnabled(hostname)
+        
+        if (!isEnabled) {
+          this._log(`Extension disabled for ${hostname}`)
+          return
+        }
+
         this._log('Activating script v2.0.0...')
         this.suppressConsoleNoise()
         this.patchNetworkRequests()
@@ -185,6 +194,31 @@
         this._notifyBackgroundScript()
       } catch (error) {
         this._logError('init', error)
+      }
+    },
+
+    /**
+     * Checks if the extension is enabled for the current site.
+     * @param {string} hostname - The hostname to check.
+     * @returns {Promise<boolean>} - True if enabled, false if disabled.
+     * @private
+     */
+    async _checkSiteEnabled(hostname) {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          const response = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+              action: 'getSiteStatus',
+              hostname: hostname
+            }, resolve)
+          })
+          
+          return response && response.enabled !== false
+        }
+        return true // Default to enabled if can't check
+      } catch (error) {
+        this._logError('_checkSiteEnabled', error)
+        return true // Default to enabled on error
       }
     },
 
