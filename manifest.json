@@ -57,7 +57,7 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self';"
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
   },
   "homepage_url": "https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector",
   "author": "Chauhan-Mukesh",
@@ -81,6 +81,6 @@
     }
   },
   "externally_connectable": {
-    "matches": ["http://*/*", "https://*/*"]
+    "matches": ["https://*/*"]
   }
 }

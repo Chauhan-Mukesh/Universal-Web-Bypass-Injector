@@ -56,25 +56,55 @@ describe('BackgroundService Extended Tests', () => {
   })
 
   describe('Installation and Updates', () => {
-    test.skip('should handle installation event', async() => {
+    test('should handle installation event', async() => {
       await BackgroundService.init()
+      
+      // Verify that the install handler was registered
+      expect(chrome.runtime.onInstalled.addListener).toHaveBeenCalled()
       const installHandler = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
 
       // Reset the mock before testing
       chrome.notifications.create.mockClear()
       
+      // Mock chrome.runtime.getURL for the notification
+      chrome.runtime.getURL = jest.fn(() => 'chrome-extension://test/icons/icon48.png')
+      
+      // Call the install handler
       installHandler({ reason: 'install' })
-      expect(chrome.notifications.create).toHaveBeenCalled()
+      
+      // Verify notification was attempted to be created
+      expect(chrome.notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'basic',
+          title: 'Universal Web Bypass Injector',
+          message: expect.stringContaining('Extension installed!')
+        }),
+        expect.any(Function)
+      )
     })
 
-    test.skip('should show welcome notification', async() => {
+    test('should show welcome notification', async() => {
+      // Mock chrome.runtime.getURL for the notification
+      chrome.runtime.getURL = jest.fn(() => 'chrome-extension://test/icons/icon48.png')
+      
       chrome.notifications.create.mockClear()
+      
+      // Call the welcome notification function
       BackgroundService.showWelcomeNotification()
       
-      // Wait for promise to resolve
+      // Wait a bit for any async operations
       await new Promise(resolve => setTimeout(resolve, 10))
       
-      expect(chrome.notifications.create).toHaveBeenCalled()
+      // Verify notification was created with expected parameters
+      expect(chrome.notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'basic',
+          iconUrl: 'chrome-extension://test/icons/icon48.png',
+          title: 'Universal Web Bypass Injector',
+          message: expect.stringContaining('Extension installed!')
+        }),
+        expect.any(Function)
+      )
     })
 
     test('should handle update event', async() => {
