@@ -18,6 +18,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Optional: Add click handlers for future features
-  // For example, a toggle button or settings
+  // Handle help link click
+  document.getElementById('help-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    chrome.tabs.create({ 
+      url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
+    });
+  });
 });

@@ -8,6 +8,10 @@
     return;
   }
 
+  // Debug mode (can be enabled for troubleshooting)
+  const DEBUG = false;
+  const log = DEBUG ? console.log.bind(console, '🛡️ UWB:') : () => {};
+
   // Universal bypass function
   function universalBypass(){
     const BLOCKED_HOSTS = [
@@ -95,9 +99,10 @@
     function removeBlockedElements() {
       try {
         // Remove tracking scripts and iframes
-        ['script', 'iframe', 'img'].forEach(tag => {
+        ['script', 'iframe', 'img', 'embed', 'object'].forEach(tag => {
           document.querySelectorAll(`${tag}[src]`).forEach(el => {
             if (BLOCKED_HOSTS.some(rx => rx.test(el.src))) {
+              console.log('🛡️ Blocked element:', el.src);
               el.remove();
             }
           });
@@ -109,13 +114,32 @@
           '[class*="paywall"]', '[id*="paywall"]', '[data-ad]', 
           'iframe[src*="ads"]', '.ad-container', '.advertisement',
           '[class*="ad-"]', '[id*="ad-"]', '.popup-overlay',
-          '.modal-backdrop', '.cookie-banner', '.gdpr-banner'
+          '.modal-backdrop', '.cookie-banner', '.gdpr-banner',
+          '[class*="modal"]', '[class*="popup"]', '[id*="popup"]',
+          '.subscription-wall', '.premium-content-overlay',
+          '[class*="subscribe"]', '[class*="membership"]'
         ];
         
         blockSelectors.forEach(selector => {
           document.querySelectorAll(selector).forEach(element => {
-            element.remove();
+            // Additional check to avoid removing important content
+            if (element.offsetHeight > window.innerHeight * 0.3 || 
+                element.classList.contains('paywall') ||
+                element.classList.contains('overlay')) {
+              console.log('🛡️ Removed overlay:', selector);
+              element.remove();
+            }
           });
+        });
+        
+        // Remove elements with suspicious z-index values (likely overlays)
+        document.querySelectorAll('*').forEach(el => {
+          const style = window.getComputedStyle(el);
+          const zIndex = parseInt(style.zIndex);
+          if (zIndex > 9000 && style.position === 'fixed') {
+            console.log('🛡️ Removed high z-index overlay:', el);
+            el.remove();
+          }
         });
       } catch (error) {
         // Silently handle any errors to avoid breaking the page
@@ -197,5 +221,8 @@
   if (document.readyState !== 'complete') {
     window.addEventListener('load', universalBypass);
   }
+  
+  // Log extension activation
+  log('Extension activated on:', window.location.href);
 
 })();
