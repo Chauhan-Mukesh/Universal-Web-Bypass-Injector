@@ -2,8 +2,9 @@
 
 ## 📋 Table of Contents
 - [Prerequisites](#prerequisites)
-- [Method 1: Load Unpacked Extension (Recommended for Testing)](#method-1-load-unpacked-extension-recommended-for-testing)
-- [Method 2: Developer Installation](#method-2-developer-installation)
+- [Method 1: Direct Download (Recommended)](#method-1-direct-download-recommended)
+- [Method 2: Load Unpacked Extension (For Development)](#method-2-load-unpacked-extension-for-development)
+- [Method 3: Build from Source](#method-3-build-from-source)
 - [Verification Steps](#verification-steps)
 - [Troubleshooting](#troubleshooting)
 - [Usage Guide](#usage-guide)
@@ -18,11 +19,69 @@ Before installing the Universal Web Bypass Injector extension, ensure you have:
 - **Developer mode** access in your browser
 - **Basic computer skills** for file management
 
-## Method 1: Load Unpacked Extension (Recommended for Local Testing)
+## Method 1: Direct Download (Recommended)
 
-This method is perfect for testing the extension locally or if you've downloaded the source code.
+🎯 **This is the easiest method for most users!**
 
-### Step 1: Download and Build the Extension
+The Universal Web Bypass Injector provides ready-to-use packages that you can download and install directly without building from source.
+
+### Step 1: Download the Extension Package
+
+1. **Visit the [Releases Page](https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector/releases)**
+2. **Find the latest release** and look for the **Assets** section
+3. **Download one of these packages**:
+   - `universal-web-bypass-injector-production-vX.X.X-TIMESTAMP.zip` - **Recommended for most users**
+   - `universal-web-bypass-injector-development-vX.X.X-TIMESTAMP.zip` - For testing/development
+
+### Step 2: Extract the Package
+1. **Locate the downloaded ZIP file** in your Downloads folder
+2. **Right-click** the ZIP file and select **"Extract All..."** or **"Extract Here"**
+3. **Choose a permanent location** for the extension folder (e.g., `Documents/Chrome Extensions/`)
+4. **Remember this location** - you'll need it for installation
+
+> ⚠️ **Important**: Don't delete the extracted folder after installation, as Chrome needs access to these files!
+
+### Step 3: Install in Chrome
+1. **Open Google Chrome**
+2. **Navigate to**: `chrome://extensions/`
+3. **Enable Developer Mode** (toggle in top-right corner)
+4. **Click "Load unpacked"**
+5. **Select the extracted folder** (the one containing `manifest.json`)
+6. **Click "Select Folder"**
+
+### Step 4: Verify Installation
+- The extension should appear in your extensions list
+- Look for the **Universal Web Bypass Injector** icon in your browser toolbar
+- The extension should be **enabled** by default
+
+### 🔐 Package Verification (Optional but Recommended)
+
+For security-conscious users, each release includes checksums to verify package integrity:
+
+1. **Download the checksums file**: Look for `*.checksums.txt` in the release assets
+2. **Verify the package**: 
+   ```bash
+   # On Windows (PowerShell)
+   Get-FileHash universal-web-bypass-injector-*.zip -Algorithm SHA256
+   
+   # On macOS/Linux
+   sha256sum universal-web-bypass-injector-*.zip
+   ```
+3. **Compare the output** with the value in the checksums file
+
+### 🔄 Auto-Updates
+When using this method, you'll need to manually check for updates:
+1. Visit the releases page periodically
+2. Download newer versions when available
+3. Remove the old extension and install the new one
+
+---
+
+## Method 2: Load Unpacked Extension (For Development)
+
+This method is perfect for developers or if you want to modify the extension code.
+
+### Step 1: Download the Source Code
 1. **Clone the repository** or **download as ZIP**:
    ```bash
    git clone https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector.git
@@ -70,9 +129,9 @@ The extension should now appear in your extensions list with:
 
 ![Extension Installed](https://via.placeholder.com/800x300/ea4335/ffffff?text=Extension+Successfully+Installed)
 
-## Method 2: Developer Installation
+## Method 3: Build from Source
 
-For developers who want to set up the development environment:
+For developers who want to build the extension from source code or set up a development environment:
 
 ### Step 1: Set Up Development Environment
 ```bash

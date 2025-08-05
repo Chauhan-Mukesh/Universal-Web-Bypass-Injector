@@ -194,19 +194,22 @@ jobs:
 
       - name: 📦 Create extension package
         run: |
-          cd dist
-          zip -r ../universal-web-bypass-injector-${{ github.sha }}.zip .
-          cd ..
-          echo "📦 Package created: universal-web-bypass-injector-${{ github.sha }}.zip"
-          ls -la *.zip
+          echo "📦 Creating Chrome Store ready package..."
+          npm run package:chrome-store
+          
+          echo "📦 Creating development package..."
+          npm run package
+          
+          echo "📦 Packages created successfully!"
+          ls -la packages/
 
       - name: 📤 Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: extension-build-${{ github.sha }}
+          name: extension-packages-${{ github.sha }}
           path: |
             dist/
-            *.zip
+            packages/
           retention-days: 30
 
   # 🔒 Security Scanning

@@ -727,7 +727,9 @@ const BackgroundService = {
       lastActivity: null,
       sessionStartTime: Date.now(),
       blockedRequests: [],
-      siteStatistics: {}
+      siteStatistics: {},
+      blockedElements: [], // Reset blocked elements log
+      elementsBlocked: 0  // Reset elements blocked count
     }
     await this.saveStorageData()
     console.log('[UWB Background] Statistics reset')
