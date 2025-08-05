@@ -18,7 +18,9 @@ module.exports = [
         chrome: 'readonly',
         UniversalBypass: 'readonly',
         // Add structuredClone for older Node.js versions
-        structuredClone: 'readonly'
+        structuredClone: 'readonly',
+        // Add test globals
+        Chart: 'readonly'
       }
     },
     rules: {
