@@ -62,7 +62,7 @@ describe('Popup Logic Tests', () => {
     expect(extractHostname('')).toBeNull()
   })
 
-  test('should send messages to background script', async () => {
+  test('should send messages to background script', async() => {
     chrome.runtime.sendMessage.mockImplementation((message, callback) => {
       callback({ success: true, data: 'test' })
     })
@@ -83,7 +83,7 @@ describe('Popup Logic Tests', () => {
     expect(result).toEqual({ success: true, data: 'test' })
   })
 
-  test('should handle message errors', async () => {
+  test('should handle message errors', async() => {
     chrome.runtime.sendMessage.mockImplementation((message, callback) => {
       chrome.runtime.lastError = { message: 'Connection failed' }
       callback(null)
@@ -105,7 +105,7 @@ describe('Popup Logic Tests', () => {
       .rejects.toThrow('Connection failed')
   })
 
-  test('should load current tab', async () => {
+  test('should load current tab', async() => {
     const mockTab = { id: 123, url: 'https://example.com', active: true }
     
     chrome.tabs.query.mockImplementation((query, callback) => {
@@ -130,7 +130,7 @@ describe('Popup Logic Tests', () => {
     expect(tab).toEqual(mockTab)
   })
 
-  test('should handle empty tab list', async () => {
+  test('should handle empty tab list', async() => {
     chrome.tabs.query.mockImplementation((query, callback) => {
       callback([])
     })
@@ -153,14 +153,14 @@ describe('Popup Logic Tests', () => {
     expect(tab).toBeNull()
   })
 
-  test('should toggle site status', async () => {
+  test('should toggle site status', async() => {
     chrome.runtime.sendMessage.mockImplementation((message, callback) => {
       if (message.action === 'toggleSite') {
         callback({ success: true, enabled: false })
       }
     })
 
-    const toggleSiteStatus = async (hostname) => {
+    const toggleSiteStatus = async(hostname) => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage({
           action: 'toggleSite',
@@ -177,14 +177,14 @@ describe('Popup Logic Tests', () => {
     }, expect.any(Function))
   })
 
-  test('should execute bypass', async () => {
+  test('should execute bypass', async() => {
     chrome.runtime.sendMessage.mockImplementation((message, callback) => {
       if (message.action === 'executeBypass') {
         callback({ success: true })
       }
     })
 
-    const executeBypass = async (tabId) => {
+    const executeBypass = async(tabId) => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage({
           action: 'executeBypass',

@@ -94,7 +94,7 @@ global.console = {
 }
 
 // Suppress JSDOM navigation errors specifically
-const originalVirtualConsole = global.jsdom?.virtualConsole
+const _originalVirtualConsole = global.jsdom?.virtualConsole
 if (typeof window !== 'undefined' && window.virtualConsole) {
   window.virtualConsole.on('jsdomError', (error) => {
     if (error.message && error.message.includes('navigation')) {
