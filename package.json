@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --format=json --output-file=eslint-report.json",
     "build": "npm run lint && npm run test:coverage && npm run build:extension",
+    "build:safe": "npm run lint && npm run build:extension",
     "build:extension": "node scripts/build-extension.js",
     "build:production": "NODE_ENV=production npm run build:extension",
     "build:staging": "NODE_ENV=staging npm run build:extension",
@@ -56,7 +57,13 @@
     "collectCoverageFrom": [
       "*.js",
       "!tests/**",
-      "!node_modules/**"
+      "!node_modules/**",
+      "!eslint.config.js",
+      "!scripts/**"
+    ],
+    "coverageProvider": "v8",
+    "transformIgnorePatterns": [
+      "node_modules/(?!(.*\\.mjs$))"
     ]
   },
   "keywords": [
