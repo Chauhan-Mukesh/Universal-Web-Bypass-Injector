@@ -782,16 +782,20 @@ const PopupController = {
 }
 
 // Initialize popup when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  PopupController.init().catch(error => {
-    console.error('[UWB Popup] Failed to initialize:', error)
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    PopupController.init().catch(error => {
+      console.error('[UWB Popup] Failed to initialize:', error)
+    })
   })
-})
+}
 
-// Handle popup unload
-window.addEventListener('beforeunload', () => {
-  PopupController.destroy()
-})
+// Handle popup unload - wrap in safety check for testing
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('beforeunload', () => {
+    PopupController.destroy()
+  })
+}
 
 // Make PopupController available globally for testing
 if (typeof window !== 'undefined') {
