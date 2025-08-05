@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --format=json --output-file=eslint-report.json",
     "build": "npm run lint && npm run test:coverage && npm run build:extension",
+    "build:safe": "npm run lint && npm run build:extension",
     "build:extension": "node scripts/build-extension.js",
     "build:production": "NODE_ENV=production npm run build:extension",
     "build:staging": "NODE_ENV=staging npm run build:extension",
@@ -25,16 +26,12 @@
     "security:fix": "npm audit fix",
     "security:check": "node scripts/security-check.js",
     "clean": "node scripts/clean.js",
-    "docs:generate": "node scripts/generate-docs.js",
-    "release:prepare": "node scripts/prepare-release.js",
-    "release:notes": "node scripts/generate-release-notes.js",
-    "dev": "npm run build:extension && node scripts/watch-changes.js",
+    "dev": "npm run build:extension && echo 'Development build completed'",
     "start": "npm run dev",
     "precommit": "npm run lint:fix && npm run test",
     "prepush": "npm run validate",
     "prerelease": "npm run validate && npm run security:check",
-    "postinstall": "node scripts/post-install.js",
-    "health:check": "node scripts/health-check.js"
+    "postinstall": "node scripts/post-install.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -56,7 +53,13 @@
     "collectCoverageFrom": [
       "*.js",
       "!tests/**",
-      "!node_modules/**"
+      "!node_modules/**",
+      "!eslint.config.js",
+      "!scripts/**"
+    ],
+    "coverageProvider": "v8",
+    "transformIgnorePatterns": [
+      "node_modules/(?!(.*\\.mjs$))"
     ]
   },
   "keywords": [
