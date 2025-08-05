@@ -99,7 +99,7 @@ describe('StatisticsController', () => {
       expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Event listeners setup complete')
     })
 
-    test('should initialize successfully with valid data', async () => {
+    test('should initialize successfully with valid data', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         if (message.action === 'getDetailedStats') {
           callback({
@@ -121,7 +121,7 @@ describe('StatisticsController', () => {
       expect(StatisticsController.data.total).toBe(100)
     })
 
-    test('should handle initialization errors', async () => {
+    test('should handle initialization errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to load' })
       })
@@ -141,7 +141,7 @@ describe('StatisticsController', () => {
   })
 
   describe('Message Handling', () => {
-    test('should send messages successfully', async () => {
+    test('should send messages successfully', async() => {
       const testMessage = { action: 'test' }
       const testResponse = { success: true }
 
@@ -155,7 +155,7 @@ describe('StatisticsController', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(testMessage, expect.any(Function))
     })
 
-    test('should handle message errors', async () => {
+    test('should handle message errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         chrome.runtime.lastError = { message: 'Connection failed' }
         callback(null)
@@ -165,7 +165,7 @@ describe('StatisticsController', () => {
         .rejects.toThrow('Connection failed')
     })
 
-    test('should handle send message exceptions', async () => {
+    test('should handle send message exceptions', async() => {
       chrome.runtime.sendMessage.mockImplementation(() => {
         throw new Error('Extension context invalidated')
       })
@@ -180,7 +180,7 @@ describe('StatisticsController', () => {
       StatisticsController.cacheElements()
     })
 
-    test('should load statistics successfully', async () => {
+    test('should load statistics successfully', async() => {
       const mockData = {
         total: 100,
         today: 25,
@@ -202,7 +202,7 @@ describe('StatisticsController', () => {
       expect(StatisticsController.elements.loadingState.style.display).toBe('none')
     })
 
-    test('should handle loading errors', async () => {
+    test('should handle loading errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to load' })
       })
@@ -213,7 +213,7 @@ describe('StatisticsController', () => {
       expect(alert).toHaveBeenCalledWith('Failed to load statistics data')
     })
 
-    test('should handle null response', async () => {
+    test('should handle null response', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback(null)
       })
@@ -357,7 +357,7 @@ describe('StatisticsController', () => {
       StatisticsController.cacheElements()
     })
 
-    test('should refresh data successfully', async () => {
+    test('should refresh data successfully', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ total: 200, today: 50 })
       })
@@ -369,7 +369,7 @@ describe('StatisticsController', () => {
       expect(StatisticsController.data.total).toBe(200)
     })
 
-    test('should handle refresh errors', async () => {
+    test('should handle refresh errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to refresh' })
       })
@@ -415,7 +415,7 @@ describe('StatisticsController', () => {
       expect(alert).toHaveBeenCalledWith('Failed to export data')
     })
 
-    test('should reset statistics with confirmation', async () => {
+    test('should reset statistics with confirmation', async() => {
       confirm.mockReturnValue(true)
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         if (message.action === 'resetStats') {
@@ -431,7 +431,7 @@ describe('StatisticsController', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'resetStats' }, expect.any(Function))
     })
 
-    test('should not reset statistics without confirmation', async () => {
+    test('should not reset statistics without confirmation', async() => {
       confirm.mockReturnValue(false)
 
       await StatisticsController.resetStatistics()
@@ -439,7 +439,7 @@ describe('StatisticsController', () => {
       expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ action: 'resetStats' }, expect.any(Function))
     })
 
-    test('should handle reset errors', async () => {
+    test('should handle reset errors', async() => {
       confirm.mockReturnValue(true)
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to reset' })
@@ -457,7 +457,7 @@ describe('StatisticsController', () => {
       StatisticsController.cacheElements()
     })
 
-    test('should enable disabled site', async () => {
+    test('should enable disabled site', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         if (message.action === 'setSiteStatus') {
           callback({ success: true })
@@ -475,7 +475,7 @@ describe('StatisticsController', () => {
       }, expect.any(Function))
     })
 
-    test('should handle enable site error', async () => {
+    test('should handle enable site error', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ error: 'Failed to enable' })
       })

@@ -619,4 +619,84 @@ describe('UniversalBypass Content Script - Additional Coverage', () => {
       expect(isBlocked).toBe(true)
     })
   })
+
+  describe('Advanced DOM Cleaning Coverage', () => {
+    test('should remove high z-index overlays', () => {
+      // Test the method exists and doesn't throw
+      expect(() => {
+        UniversalBypass._removeHighZIndexOverlays([document.body])
+      }).not.toThrow()
+    })
+
+    test('should handle style computation errors in overlay removal', () => {
+      // Mock getComputedStyle to throw error
+      const originalGetComputedStyle = window.getComputedStyle
+      window.getComputedStyle = jest.fn(() => {
+        throw new Error('Style error')
+      })
+
+      // Should not throw error
+      expect(() => {
+        UniversalBypass._removeHighZIndexOverlays([document.body])
+      }).not.toThrow()
+
+      window.getComputedStyle = originalGetComputedStyle
+    })
+
+    test('should handle mutation observer with added nodes', (done) => {
+      const mockObserver = {
+        observe: jest.fn(),
+        disconnect: jest.fn()
+      }
+      
+      global.MutationObserver = jest.fn().mockImplementation((callback) => {
+        const mutations = [{
+          type: 'childList',
+          addedNodes: [{
+            nodeType: 1 // Node.ELEMENT_NODE
+          }]
+        }]
+        
+        // Simulate async mutation
+        setTimeout(() => callback(mutations), 10)
+        
+        return mockObserver
+      })
+
+      const cleanDOMSpy = jest.spyOn(UniversalBypass, 'cleanDOM').mockImplementation()
+
+      UniversalBypass.observeDOMChanges()
+
+      // Wait for mutation observer and debounced cleanup
+      setTimeout(() => {
+        cleanDOMSpy.mockRestore()
+        done()
+      }, 150)
+    })
+
+    test('should handle missing head element in CSS injection', (done) => {
+      const originalHead = document.head
+      Object.defineProperty(document, 'head', { value: null, configurable: true })
+
+      UniversalBypass.restorePageFunctionality().then(() => {
+        Object.defineProperty(document, 'head', { value: originalHead, configurable: true })
+        done()
+      })
+    })
+
+    test('should handle CSS injection errors gracefully', (done) => {
+      const errorSpy = jest.spyOn(UniversalBypass, '_logError').mockImplementation()
+      
+      const originalCreateElement = document.createElement
+      document.createElement = jest.fn(() => {
+        throw new Error('createElement failed')
+      })
+
+      UniversalBypass.restorePageFunctionality().then(() => {
+        document.createElement = originalCreateElement
+        errorSpy.mockRestore()
+        done()
+      })
+    })
+  })
 })

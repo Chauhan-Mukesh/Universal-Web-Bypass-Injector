@@ -69,7 +69,7 @@ describe('PopupController', () => {
     }))
 
     // Mock setTimeout for animations
-    global.setTimeout = jest.fn((fn, delay) => fn())
+    global.setTimeout = jest.fn((fn, _delay) => fn())
 
     // Mock console
     global.console = {
@@ -103,7 +103,7 @@ describe('PopupController', () => {
       expect(document.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function))
     })
 
-    test('should initialize successfully with valid data', async () => {
+    test('should initialize successfully with valid data', async() => {
       // Mock successful responses
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com', title: 'Example' }])
@@ -127,7 +127,7 @@ describe('PopupController', () => {
       expect(PopupController.stats.blocked).toBe(10)
     })
 
-    test('should handle initialization errors gracefully', async () => {
+    test('should handle initialization errors gracefully', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         chrome.runtime.lastError = { message: 'Permission denied' }
         callback([])
@@ -141,7 +141,7 @@ describe('PopupController', () => {
   })
 
   describe('Tab Management', () => {
-    test('should query active tab successfully', async () => {
+    test('should query active tab successfully', async() => {
       const mockTab = { id: 123, url: 'https://example.com', title: 'Example' }
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([mockTab])
@@ -155,7 +155,7 @@ describe('PopupController', () => {
       )
     })
 
-    test('should handle query tab errors', async () => {
+    test('should handle query tab errors', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         chrome.runtime.lastError = { message: 'Permission denied' }
         callback([])
@@ -164,7 +164,7 @@ describe('PopupController', () => {
       await expect(PopupController.queryActiveTab()).rejects.toThrow('Permission denied')
     })
 
-    test('should load current tab and stats', async () => {
+    test('should load current tab and stats', async() => {
       const mockTab = { id: 123, url: 'https://example.com' }
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([mockTab])
@@ -182,7 +182,7 @@ describe('PopupController', () => {
       expect(PopupController.stats.blocked).toBe(15)
     })
 
-    test('should handle empty tab list', async () => {
+    test('should handle empty tab list', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([])
       })
@@ -195,7 +195,7 @@ describe('PopupController', () => {
   })
 
   describe('Site Status Management', () => {
-    test('should load site status successfully', async () => {
+    test('should load site status successfully', async() => {
       PopupController.currentTab = { url: 'https://example.com/page' }
 
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
@@ -210,7 +210,7 @@ describe('PopupController', () => {
       expect(PopupController.siteStatus.enabled).toBe(false)
     })
 
-    test('should handle invalid URLs gracefully', async () => {
+    test('should handle invalid URLs gracefully', async() => {
       PopupController.currentTab = { url: 'invalid-url' }
 
       await PopupController.loadSiteStatus()
@@ -218,7 +218,7 @@ describe('PopupController', () => {
       expect(console.log).toHaveBeenCalled()
     })
 
-    test('should toggle site status', async () => {
+    test('should toggle site status', async() => {
       PopupController.siteStatus = { hostname: 'example.com', enabled: true }
       PopupController.cacheElements()
 
@@ -239,7 +239,7 @@ describe('PopupController', () => {
   })
 
   describe('Statistics Management', () => {
-    test('should load statistics successfully', async () => {
+    test('should load statistics successfully', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         if (message.action === 'getStats') {
           callback({ 
@@ -258,7 +258,7 @@ describe('PopupController', () => {
   })
 
   describe('Message Handling', () => {
-    test('should send messages successfully', async () => {
+    test('should send messages successfully', async() => {
       const testMessage = { action: 'test' }
       const testResponse = { success: true }
 
@@ -272,7 +272,7 @@ describe('PopupController', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(testMessage, expect.any(Function))
     })
 
-    test('should handle message errors', async () => {
+    test('should handle message errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         chrome.runtime.lastError = { message: 'Connection failed' }
         callback(null)
@@ -282,7 +282,7 @@ describe('PopupController', () => {
         .rejects.toThrow('Connection failed')
     })
 
-    test('should handle send message exceptions', async () => {
+    test('should handle send message exceptions', async() => {
       chrome.runtime.sendMessage.mockImplementation(() => {
         throw new Error('Extension context invalidated')
       })
@@ -364,7 +364,7 @@ describe('PopupController', () => {
       PopupController.currentTab = { id: 123, url: 'https://example.com' }
     })
 
-    test('should toggle bypass functionality', async () => {
+    test('should toggle bypass functionality', async() => {
       chrome.runtime.sendMessage.mockImplementation((message, callback) => {
         callback({ success: true })
       })
@@ -377,7 +377,7 @@ describe('PopupController', () => {
       }, expect.any(Function))
     })
 
-    test('should refresh current tab', async () => {
+    test('should refresh current tab', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com' }])
       })
@@ -424,7 +424,7 @@ describe('PopupController', () => {
       expect(window.close).toHaveBeenCalled()
     })
 
-    test('should handle Ctrl+R for refresh', async () => {
+    test('should handle Ctrl+R for refresh', async() => {
       const mockEvent = { key: 'r', ctrlKey: true, preventDefault: jest.fn() }
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com' }])
@@ -617,7 +617,7 @@ describe('PopupController', () => {
       PopupController.currentTab = { id: 123, url: 'https://example.com' }
     })
 
-    test('should refresh current tab successfully', async () => {
+    test('should refresh current tab successfully', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com' }])
       })
@@ -632,7 +632,7 @@ describe('PopupController', () => {
       expect(mockElements.refreshButton.disabled).toBe(false)
     })
 
-    test('should handle refresh errors', async () => {
+    test('should handle refresh errors', async() => {
       chrome.tabs.query.mockImplementation((query, callback) => {
         chrome.runtime.lastError = { message: 'Permission denied' }
         callback([])
@@ -663,7 +663,7 @@ describe('PopupController', () => {
       closeSpy.mockRestore()
     })
 
-    test('should handle Ctrl+R for refresh', async () => {
+    test('should handle Ctrl+R for refresh', async() => {
       const mockEvent = { key: 'r', ctrlKey: true, preventDefault: jest.fn() }
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com' }])
@@ -691,7 +691,7 @@ describe('PopupController', () => {
       closeSpy.mockRestore()
     })
 
-    test('should handle Meta+R for refresh on Mac', async () => {
+    test('should handle Meta+R for refresh on Mac', async() => {
       const mockEvent = { key: 'r', metaKey: true, preventDefault: jest.fn() }
       chrome.tabs.query.mockImplementation((query, callback) => {
         callback([{ id: 123, url: 'https://example.com' }])
