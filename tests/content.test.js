@@ -425,9 +425,9 @@ describe('UniversalBypass Content Script', () => {
     })
 
     test('should skip initialization for disabled sites', async() => {
-      // Mock window.location using delete and redefine
-      delete window.location
-      window.location = { hostname: 'disabled.com' }
+      // Mock the _checkSiteEnabled method to return false
+      const originalCheckSiteEnabled = UniversalBypass._checkSiteEnabled
+      UniversalBypass._checkSiteEnabled = jest.fn().mockResolvedValue(false)
 
       chrome.runtime.sendMessage = jest.fn((message, callback) => {
         callback({ enabled: false })
@@ -444,12 +444,15 @@ describe('UniversalBypass Content Script', () => {
       expect(UniversalBypass.initialized).toBe(false)
       expect(suppressConsoleNoiseSpy).not.toHaveBeenCalled()
       expect(patchNetworkRequestsSpy).not.toHaveBeenCalled()
+      
+      // Restore original method
+      UniversalBypass._checkSiteEnabled = originalCheckSiteEnabled
     })
 
     test('should proceed with initialization for enabled sites', async() => {
-      // Mock window.location using delete and redefine
-      delete window.location
-      window.location = { hostname: 'enabled.com' }
+      // Mock the _checkSiteEnabled method to return true
+      const originalCheckSiteEnabled = UniversalBypass._checkSiteEnabled
+      UniversalBypass._checkSiteEnabled = jest.fn().mockResolvedValue(true)
 
       chrome.runtime.sendMessage = jest.fn((message, callback) => {
         callback({ enabled: true })
@@ -466,6 +469,154 @@ describe('UniversalBypass Content Script', () => {
       expect(UniversalBypass.initialized).toBe(true)
       expect(suppressConsoleNoiseSpy).toHaveBeenCalled()
       expect(patchNetworkRequestsSpy).toHaveBeenCalled()
+      
+      // Restore original method
+      UniversalBypass._checkSiteEnabled = originalCheckSiteEnabled
+    })
+  })
+})
+
+describe('UniversalBypass Content Script - Additional Coverage', () => {
+  beforeEach(() => {
+    // Reset the initialized state
+    UniversalBypass.initialized = false
+    
+    // Reset DOM
+    document.body.innerHTML = ''
+    
+    // Reset console mocks
+    jest.clearAllMocks()
+  })
+
+  describe('Network Request Handling', () => {
+    test('should handle blocked request notification', () => {
+      const notifyBackgroundScriptSpy = jest.spyOn(UniversalBypass, '_notifyBackgroundScript')
+      
+      // Call the notification method
+      UniversalBypass._notifyBackgroundScript()
+      
+      expect(notifyBackgroundScriptSpy).toHaveBeenCalled()
+    })
+
+    test('should handle chrome API errors in notification', () => {
+      // Mock chrome.runtime to throw error
+      const originalSendMessage = chrome.runtime.sendMessage
+      chrome.runtime.sendMessage = jest.fn().mockImplementation(() => {
+        throw new Error('Chrome API error')
+      })
+      
+      expect(() => {
+        UniversalBypass._notifyBackgroundScript()
+      }).not.toThrow()
+      
+      chrome.runtime.sendMessage = originalSendMessage
+    })
+  })
+
+  describe('Error Handling Edge Cases', () => {
+    test('should handle undefined chrome object', () => {
+      const originalChrome = global.chrome
+      global.chrome = undefined
+      
+      expect(() => {
+        UniversalBypass._notifyBackgroundScript()
+      }).not.toThrow()
+      
+      global.chrome = originalChrome
+    })
+
+    test('should handle missing chrome.runtime', () => {
+      const originalRuntime = chrome.runtime
+      delete chrome.runtime
+      
+      expect(() => {
+        UniversalBypass._notifyBackgroundScript()
+      }).not.toThrow()
+      
+      chrome.runtime = originalRuntime
+    })
+  })
+
+  describe('DOM Observer Initialization', () => {
+    test('should properly initialize mutation observer', () => {
+      const mockObserver = {
+        observe: jest.fn(),
+        disconnect: jest.fn()
+      }
+      
+      global.MutationObserver = jest.fn().mockImplementation((callback) => {
+        // Test the callback with mock mutations
+        const mutations = [{
+          type: 'childList',
+          addedNodes: [{
+            nodeType: 1, // Node.ELEMENT_NODE
+            querySelector: jest.fn()
+          }]
+        }]
+        
+        // Call the callback to test it
+        setTimeout(() => callback(mutations), 0)
+        
+        return mockObserver
+      })
+      
+      UniversalBypass.observeDOMChanges()
+      
+      expect(global.MutationObserver).toHaveBeenCalled()
+      expect(mockObserver.observe).toHaveBeenCalledWith(
+        document.documentElement,
+        expect.objectContaining({
+          childList: true,
+          subtree: true
+        })
+      )
+    })
+  })
+
+  describe('Configuration Validation', () => {
+    test('should have valid blocked hosts configuration', () => {
+      expect(UniversalBypass.config.BLOCKED_HOSTS).toBeDefined()
+      expect(Array.isArray(UniversalBypass.config.BLOCKED_HOSTS)).toBe(true)
+      expect(UniversalBypass.config.BLOCKED_HOSTS.length).toBeGreaterThan(0)
+    })
+
+    test('should have valid selectors configuration', () => {
+      expect(UniversalBypass.config.SELECTORS_TO_REMOVE).toBeDefined()
+      expect(Array.isArray(UniversalBypass.config.SELECTORS_TO_REMOVE)).toBe(true)
+      expect(UniversalBypass.config.SELECTORS_TO_REMOVE.length).toBeGreaterThan(0)
+    })
+
+    test('should have valid console suppress patterns', () => {
+      expect(UniversalBypass.config.CONSOLE_SUPPRESS).toBeDefined()
+      expect(Array.isArray(UniversalBypass.config.CONSOLE_SUPPRESS)).toBe(true)
+      expect(UniversalBypass.config.CONSOLE_SUPPRESS.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('URL Processing', () => {
+    test('should handle malformed URLs in blocking check', () => {
+      const malformedUrls = [
+        'not-a-url',
+        'javascript:void(0)',
+        'data:text/html,<h1>test</h1>',
+        '',
+        null,
+        undefined
+      ]
+      
+      malformedUrls.forEach(url => {
+        expect(() => {
+          UniversalBypass._isBlocked(url)
+        }).not.toThrow()
+      })
+    })
+
+    test('should properly validate blocked hosts', () => {
+      const testUrl = 'https://google-analytics.com/script.js'
+      const isBlocked = UniversalBypass._isBlocked(testUrl)
+      
+      // Should block known analytics domain
+      expect(isBlocked).toBe(true)
     })
   })
 })

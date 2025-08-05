@@ -13,6 +13,7 @@ if (typeof window !== 'undefined' && window.location === null) {
       href: 'chrome-extension://test/popup.html',
       protocol: 'chrome-extension:',
       host: 'test',
+      hostname: 'test',
       search: '',
       pathname: '/popup.html'
     },
@@ -90,6 +91,18 @@ global.console = {
   log: jest.fn(),
   warn: jest.fn(),
   error: jest.fn()
+}
+
+// Suppress JSDOM navigation errors specifically
+const _originalVirtualConsole = global.jsdom?.virtualConsole
+if (typeof window !== 'undefined' && window.virtualConsole) {
+  window.virtualConsole.on('jsdomError', (error) => {
+    if (error.message && error.message.includes('navigation')) {
+      // Suppress navigation errors in tests
+      return
+    }
+    console.error(error)
+  })
 }
 
 // Mock DOM methods

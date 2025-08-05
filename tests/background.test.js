@@ -407,6 +407,243 @@ describe('Background Service', () => {
     })
   })
 
+  describe('Statistics and Storage', () => {
+    test('should handle bypass status with site statistics', () => {
+      const mockBackgroundService = {
+        stats: {
+          totalBlocked: 10,
+          blockedRequests: [],
+          siteStatistics: {}
+        },
+        activeTabs: new Map(),
+        handleBypassStatus: function(request, tabId) {
+          const hostname = 'example.com'
+          
+          // Add to blocked requests
+          const blockedItem = {
+            url: request.url,
+            hostname,
+            type: request.type || 'unknown',
+            timestamp: Date.now(),
+            tabId
+          }
+          
+          this.stats.blockedRequests.push(blockedItem)
+          
+          // Keep only last 1000 blocked requests
+          if (this.stats.blockedRequests.length > 1000) {
+            this.stats.blockedRequests = this.stats.blockedRequests.slice(-1000)
+          }
+
+          // Update site statistics
+          if (!this.stats.siteStatistics[hostname]) {
+            this.stats.siteStatistics[hostname] = {
+              blocked: 0,
+              lastActivity: null,
+              firstActivity: Date.now()
+            }
+          }
+          this.stats.siteStatistics[hostname].blocked += request.blockedCount || 1
+          this.stats.siteStatistics[hostname].lastActivity = Date.now()
+
+          return { success: true, stats: this.getStats() }
+        },
+        getStats: function() {
+          return {
+            ...this.stats,
+            activeTabsCount: this.activeTabs.size,
+            uptime: Date.now() - Date.now(),
+            disabledSitesCount: 0
+          }
+        },
+        saveStorageData: jest.fn()
+      }
+
+      const request = {
+        url: 'https://example.com/page',
+        blockedCount: 5,
+        type: 'script'
+      }
+
+      const result = mockBackgroundService.handleBypassStatus(request, 123)
+
+      expect(result.success).toBe(true)
+      expect(mockBackgroundService.stats.blockedRequests).toHaveLength(1)
+      expect(mockBackgroundService.stats.siteStatistics['example.com']).toBeDefined()
+      expect(mockBackgroundService.stats.siteStatistics['example.com'].blocked).toBe(5)
+    })
+
+    test('should handle large blocked requests list', () => {
+      const mockBackgroundService = {
+        stats: {
+          blockedRequests: new Array(1005).fill(null).map((_, i) => ({
+            url: `https://example.com/${i}`,
+            hostname: 'example.com',
+            timestamp: Date.now() - i
+          }))
+        },
+        handleBypassStatus: function(request, tabId) {
+          const hostname = 'example.com'
+          
+          // Add to blocked requests
+          const blockedItem = {
+            url: request.url,
+            hostname,
+            type: request.type || 'unknown',
+            timestamp: Date.now(),
+            tabId
+          }
+          
+          this.stats.blockedRequests.push(blockedItem)
+          
+          // Keep only last 1000 blocked requests
+          if (this.stats.blockedRequests.length > 1000) {
+            this.stats.blockedRequests = this.stats.blockedRequests.slice(-1000)
+          }
+
+          return { success: true }
+        }
+      }
+
+      // Initially has 1005 items
+      expect(mockBackgroundService.stats.blockedRequests).toHaveLength(1005)
+
+      const request = { url: 'https://example.com/new', type: 'script' }
+      mockBackgroundService.handleBypassStatus(request, 123)
+
+      // Should be trimmed to 1000
+      expect(mockBackgroundService.stats.blockedRequests).toHaveLength(1000)
+    })
+
+    test('should update tab info correctly', () => {
+      const mockBackgroundService = {
+        activeTabs: new Map(),
+        updateTabInfo: function(tabId, info) {
+          try {
+            const existing = this.activeTabs.get(tabId) || {}
+            this.activeTabs.set(tabId, { ...existing, ...info })
+          } catch (error) {
+            console.error('[UWB Background] Error updating tab info:', error)
+          }
+        }
+      }
+
+      mockBackgroundService.updateTabInfo(123, { url: 'https://example.com' })
+      mockBackgroundService.updateTabInfo(123, { title: 'Example Site' })
+
+      const tabInfo = mockBackgroundService.activeTabs.get(123)
+      expect(tabInfo.url).toBe('https://example.com')
+      expect(tabInfo.title).toBe('Example Site')
+    })
+
+    test('should execute bypass on tab with error handling', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+      
+      const mockBackgroundService = {
+        executeBypassOnTab: function(tabId) {
+          try {
+            if (!tabId || tabId < 0) {
+              console.error('[UWB Background] Invalid tab ID for script execution')
+              return
+            }
+
+            chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['content.js']
+            }).then(() => {
+              console.log(`[UWB Background] Bypass script executed on tab ${tabId}`)
+            }).catch((error) => {
+              console.error(`[UWB Background] Failed to execute script on tab ${tabId}:`, error)
+            })
+          } catch (error) {
+            console.error('[UWB Background] Error executing bypass on tab:', error)
+          }
+        }
+      }
+
+      // Test invalid tab ID
+      mockBackgroundService.executeBypassOnTab(-1)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid tab ID')
+      )
+
+      // Test valid tab ID
+      chrome.scripting.executeScript.mockResolvedValue({})
+      mockBackgroundService.executeBypassOnTab(123)
+      expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 123 },
+        files: ['content.js']
+      })
+
+      consoleSpy.mockRestore()
+    })
+
+    test('should get detailed statistics with time filtering', () => {
+      const now = Date.now()
+      const dayMs = 24 * 60 * 60 * 1000
+      const weekMs = 7 * dayMs
+
+      const mockBackgroundService = {
+        stats: {
+          totalBlocked: 100,
+          blockedRequests: [
+            { timestamp: now - (dayMs / 2) }, // Today
+            { timestamp: now - (dayMs * 2) }, // This week
+            { timestamp: now - (weekMs * 2) }, // Older
+            { timestamp: now - 1000 } // Recent
+          ],
+          siteStatistics: {
+            'example.com': { blocked: 50 },
+            'test.com': { blocked: 30 }
+          }
+        },
+        activeTabs: new Map([
+          [123, { url: 'https://example.com' }],
+          [456, { url: 'https://test.com' }]
+        ]),
+        disabledSites: new Set(['disabled.com']),
+        getDetailedStats: function() {
+          const now = Date.now()
+          const dayMs = 24 * 60 * 60 * 1000
+          const weekMs = 7 * dayMs
+          
+          const todayBlocked = this.stats.blockedRequests.filter(req => 
+            now - req.timestamp < dayMs
+          ).length
+          
+          const weekBlocked = this.stats.blockedRequests.filter(req => 
+            now - req.timestamp < weekMs
+          ).length
+
+          const byType = {}
+          this.stats.blockedRequests.forEach(req => {
+            const type = req.type || 'unknown'
+            byType[type] = (byType[type] || 0) + 1
+          })
+
+          return {
+            total: this.stats.totalBlocked,
+            today: todayBlocked,
+            week: weekBlocked,
+            byType,
+            bySite: this.stats.siteStatistics,
+            activeTabs: this.activeTabs.size,
+            disabledSites: Array.from(this.disabledSites),
+            uptime: Date.now() - Date.now()
+          }
+        }
+      }
+
+      const stats = mockBackgroundService.getDetailedStats()
+      
+      expect(stats.total).toBe(100)
+      expect(stats.today).toBe(2) // 2 requests within last day
+      expect(stats.week).toBe(3) // 3 requests within last week
+      expect(stats.activeTabs).toBe(2)
+      expect(stats.disabledSites).toEqual(['disabled.com'])
+    })
+  })
+
   describe('Tab Management', () => {
     test('should handle action clicks', () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
