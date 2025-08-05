@@ -544,7 +544,7 @@ const StatisticsController = {
    * @private
    */
   formatNumber(num) {
-    return new Intl.NumberFormat().format(num)
+    return new Intl.NumberFormat('en-US').format(num)
   },
 
   /**

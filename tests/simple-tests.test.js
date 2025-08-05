@@ -41,7 +41,7 @@ describe('Simple Coverage Tests', () => {
 
     test('should format numbers correctly', () => {
       const formatNumber = (num) => {
-        return new Intl.NumberFormat().format(num)
+        return new Intl.NumberFormat('en-US').format(num)
       }
 
       expect(formatNumber(1234)).toBe('1,234')
