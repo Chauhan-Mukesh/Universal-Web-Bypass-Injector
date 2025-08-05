@@ -37,7 +37,7 @@ function validateBuildDir() {
     process.exit(1)
   }
 
-  const requiredFiles = ['manifest.json', 'background.js', 'content.js']
+  const requiredFiles = ['manifest.json', 'background.js', 'content.js', 'popup.html', 'popup.js', 'statistics.html', 'statistics.js']
   const missingFiles = requiredFiles.filter(file =>
     !fs.existsSync(path.join(CONFIG.buildDir, file))
   )

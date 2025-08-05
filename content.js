@@ -78,7 +78,7 @@
         'target.com'
       ],
       BLOCKED_HOSTS: [
-        // Analytics & Trackers
+        // Analytics & Trackers (Core)
         'sb\\.scorecardresearch\\.com',
         'analytics\\.google\\.com',
         'google-analytics\\.com',
@@ -96,7 +96,28 @@
         'i\\.clean\\.gg',
         'm\\.stripe\\.network',
         'googletagmanager\\.com',
-        // Ads
+        
+        // Enhanced Analytics & Trackers (EasyList/uBlock patterns)
+        'hotjar\\.com',
+        'fullstory\\.com',
+        'mixpanel\\.com',
+        'segment\\.(io|com)',
+        'amplitude\\.com',
+        'heap\\.io',
+        'mouseflow\\.com',
+        'crazyegg\\.com',
+        'smartlook\\.com',
+        'logrocket\\.com',
+        'quantummetric\\.com',
+        'contentsquare\\.net',
+        'adobe\\.com/analytics',
+        'omniture\\.com',
+        'newrelic\\.com',
+        'pingdom\\.net',
+        'gtm\\.js',
+        'gtag\\.js',
+        
+        // Ads & Ad Networks (Core)
         'securepubads\\.g\\.doubleclick\\.net',
         'ads\\.pubmatic\\.com',
         'static\\.ads-twitter\\.com',
@@ -113,10 +134,55 @@
         'taboola\\.com',
         'criteo\\.com',
         'pubmatic\\.com',
+        
+        // Enhanced Ad Networks (EasyList patterns)
+        'adsnative\\.com',
+        'adsystem\\.com',
+        'advertising\\.com',
+        'adsystem\\.net',
+        'adnxs\\.com',
+        'appnexus\\.com',
+        'rubiconproject\\.com',
+        'openx\\.net',
+        'indexexchange\\.com',
+        'smartadserver\\.com',
+        'adsystem\\.org',
+        'spotxchange\\.com',
+        'liveramp\\.com',
+        'bidswitch\\.net',
+        'rlcdn\\.com',
+        'adsystem\\.eu',
+        'teads\\.tv',
+        'sovrn\\.com',
+        'sharethrough\\.com',
+        'amazon-adsystem',
+        'googletag\\.js',
+        
+        // Social Media Trackers
+        'tr\\.facebook\\.com',
+        'analytics\\.twitter\\.com',
+        'ads\\.linkedin\\.com',
+        'ads\\.pinterest\\.com',
+        'ads\\.snapchat\\.com',
+        'ads\\.tiktok\\.com',
+        
+        // Privacy/GDPR Compliance
+        'cookielaw\\.org',
+        'onetrust\\.com',
+        'trustarc\\.com',
+        'consent\\.youtube\\.com',
+        
         // Specific Content/Paywalls
         'hb-scribd\\.s3\\.us-east-2\\.amazonaws\\.com',
         's-f\\.scribdassets\\.com',
-        'chartbeat_mab\\.js'
+        'chartbeat_mab\\.js',
+        
+        // Anti-Adblock Detection
+        'fuckadblock\\.js',
+        'adblock-detector',
+        'blockadblock',
+        'anti-adblock',
+        'adblock\\.js'
       ].map(pattern => new RegExp('^https?://([^/]+\\.)?' + pattern, 'i')),
 
       SELECTORS_TO_REMOVE: [
@@ -125,6 +191,12 @@
         '.disable-adblock',
         '[class*="adblock-"][class*="modal"]',
         '[class*="adblock-"][class*="popup"]',
+        '[class*="anti-adblock"]',
+        '[id*="adblock-detector"]',
+        '[id*="anti-adb"]',
+        '.adb-detector',
+        '.anti-ad-blocker',
+        
         // Paywalls/Overlays - more specific
         '.paywall-overlay',
         '.paywall-modal',
@@ -133,6 +205,20 @@
         '[class*="paywall"][class*="modal"]',
         '[id*="paywall"][class*="overlay"]',
         '[id*="paywall"][class*="modal"]',
+        '.premium-wall',
+        '.subscriber-wall',
+        '.registration-wall',
+        '.login-wall',
+        '.piano-template-modal',
+        '.tp-modal',
+        '.paid-content-overlay',
+        
+        // High z-index overlays (commonly used for paywalls)
+        '[style*="z-index: 999999"]',
+        '[style*="z-index: 9999"]',
+        '[style*="z-index:999999"]',
+        '[style*="z-index:9999"]',
+        
         // Known ad containers
         '[data-ad-container]',
         '[data-ad-unit]',
@@ -140,14 +226,41 @@
         'iframe[src*="googlesyndication"]',
         '[class^="google-ad-"]',
         '[id^="google_ads"]',
+        '.adsystem',
+        '.ad-banner',
+        '.advertisement',
+        '[class*="adsense"]',
+        
         // Additional specific selectors
         '.subscription-wall',
         '.premium-content-overlay',
         '.membership-paywall',
+        '.content-gate',
+        '.access-gate',
+        '.signin-prompt',
+        '.newsletter-signup-overlay',
+        '.email-capture-modal',
+        
         // Cookie/GDPR banners (commonly problematic)
         '.cookie-banner[style*="fixed"]',
         '.gdpr-banner[style*="fixed"]',
-        '[class*="cookie"][class*="banner"][style*="z-index"]'
+        '[class*="cookie"][class*="banner"][style*="z-index"]',
+        '.consent-banner',
+        '.privacy-banner',
+        '.onetrust-banner-sdk',
+        
+        // Blur overlays commonly used for paywalls
+        '[style*="filter: blur"]',
+        '[style*="filter:blur"]',
+        '.content-blur',
+        '.blurred-content',
+        
+        // Modal and overlay patterns
+        '.modal-backdrop',
+        '.overlay-backdrop',
+        '[class*="backdrop"][style*="position: fixed"]',
+        '.popup-overlay',
+        '.modal-overlay'
       ],
 
       CONSOLE_SUPPRESS: [
@@ -242,6 +355,10 @@
         await this.restorePageFunctionality()
         this.cleanDOM()
         this.observeDOMChanges()
+        
+        // Handle restricted content gracefully
+        this._handleRestrictedContent()
+        
         this.initialized = true
         this._log('Script is active. Page has been cleaned and is being monitored.')
 
@@ -262,6 +379,147 @@
       return this.config.PROTECTED_SITES.some(site => 
         hostname === site || hostname.endsWith('.' + site)
       )
+    },
+
+    /**
+     * Detects if content is restricted due to login/premium gating and handles gracefully.
+     * @private
+     * @returns {boolean} - True if restricted content was detected and handled.
+     */
+    _handleRestrictedContent() {
+      try {
+        const restrictedIndicators = [
+          // Login/subscription requirements
+          '.login-required',
+          '.subscription-required',
+          '.premium-content',
+          '.member-only',
+          '.subscriber-only',
+          // Common text patterns
+          '[class*="signin"][class*="required"]',
+          '[id*="login"][id*="required"]',
+          // Specific platform indicators
+          '.piano-offer-template',
+          '.meter-paywall',
+          '.article-gate',
+          '.content-lock'
+        ]
+
+        const restrictedElements = restrictedIndicators
+          .map(selector => document.querySelectorAll(selector))
+          .filter(nodeList => nodeList.length > 0)
+
+        if (restrictedElements.length > 0) {
+          this._log('Detected restricted content, attempting graceful handling...')
+          
+          // Check for Internet Archive availability
+          this._suggestAlternativeAccess()
+          
+          // Look for free preview content
+          this._revealPreviewContent()
+          
+          return true
+        }
+
+        return false
+      } catch (error) {
+        this._logError('_handleRestrictedContent', error)
+        return false
+      }
+    },
+
+    /**
+     * Suggests alternative access methods for restricted content.
+     * @private
+     */
+    _suggestAlternativeAccess() {
+      try {
+        const currentUrl = window.location.href
+        const archiveUrl = `https://web.archive.org/web/${currentUrl}`
+        
+        // Create a non-intrusive suggestion banner
+        const banner = document.createElement('div')
+        banner.id = 'uwb-access-banner'
+        banner.style.cssText = `
+          position: fixed;
+          top: 10px;
+          right: 10px;
+          background: #4f46e5;
+          color: white;
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-family: system-ui, sans-serif;
+          font-size: 14px;
+          z-index: 1000000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          max-width: 300px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        `
+        
+        banner.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🌐</span>
+            <span>Content restricted? Try Internet Archive</span>
+            <span style="margin-left: auto; font-size: 18px;">&times;</span>
+          </div>
+        `
+        
+        banner.addEventListener('click', (e) => {
+          e.preventDefault()
+          if (e.target.textContent === '×') {
+            banner.remove()
+          } else {
+            window.open(archiveUrl, '_blank')
+          }
+        })
+        
+        document.body.appendChild(banner)
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+          if (banner.parentNode) {
+            banner.remove()
+          }
+        }, 10000)
+        
+        this._log('Alternative access suggestion displayed')
+      } catch (error) {
+        this._logError('_suggestAlternativeAccess', error)
+      }
+    },
+
+    /**
+     * Attempts to reveal any available preview content.
+     * @private
+     */
+    _revealPreviewContent() {
+      try {
+        // Remove common blur filters used on restricted content
+        const blurredElements = document.querySelectorAll('[style*="blur"], .blurred, .preview-only')
+        blurredElements.forEach(element => {
+          element.style.filter = 'none'
+          element.style.webkitFilter = 'none'
+          if (element.classList.contains('blurred')) {
+            element.classList.remove('blurred')
+          }
+        })
+
+        // Restore text content that might be truncated
+        const truncatedElements = document.querySelectorAll('.truncated, .preview-text, [class*="fade-out"]')
+        truncatedElements.forEach(element => {
+          element.style.maxHeight = 'none'
+          element.style.overflow = 'visible'
+          element.style.webkitMaskImage = 'none'
+          element.style.maskImage = 'none'
+        })
+
+        if (blurredElements.length > 0 || truncatedElements.length > 0) {
+          this._log('Revealed preview content where possible')
+        }
+      } catch (error) {
+        this._logError('_revealPreviewContent', error)
+      }
     },
 
     /**
