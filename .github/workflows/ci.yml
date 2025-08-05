@@ -50,6 +50,8 @@ jobs:
         id: check
         run: |
           echo "🔍 Evaluating CI run conditions..."
+          echo "Event name: ${{ github.event_name }}"
+          echo "PR draft status: ${{ github.event.pull_request.draft }}"
           
           # Default to running unless we have a specific reason not to
           SHOULD_RUN="true"
@@ -64,12 +66,14 @@ jobs:
           
           # Check for skip markers in commit message
           COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title }}"
+          echo "Commit message: $COMMIT_MSG"
           if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
             echo "⏭️ CI skip requested in commit message"
             SHOULD_RUN="false"
           fi
           
           echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+          echo "Final decision: should_run=$SHOULD_RUN"
           
           if [ "$SHOULD_RUN" = "true" ]; then
             echo "✅ Proceeding with CI pipeline"
@@ -87,7 +91,7 @@ jobs:
     name: 🧪 Test Suite
     runs-on: ${{ matrix.os }}
     needs: preflight
-    if: always() && (needs.preflight.outputs.should_run == 'true' || needs.preflight.result == 'skipped')
+    if: needs.preflight.result == 'success' && needs.preflight.outputs.should_run == 'true'
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -148,7 +152,7 @@ jobs:
     name: 🏗️ Build & Package
     runs-on: ubuntu-latest
     needs: [preflight, test]
-    if: always() && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped')
+    if: needs.preflight.result == 'success' && needs.preflight.outputs.should_run == 'true'
     timeout-minutes: 10
     
     steps:
@@ -168,28 +172,19 @@ jobs:
         run: |
           echo "🔨 Building extension..."
           
-          # Try full build first (includes tests and coverage)
-          if npm run build; then
-            echo "✅ Full build with tests completed successfully"
-          else
-            echo "⚠️ Full build failed, attempting build without coverage..."
-            
-            # Fallback: build without requiring coverage tests
-            if npm run lint && npm run build:extension; then
-              echo "✅ Basic build completed successfully"
-            else
-              echo "❌ Build failed even without coverage requirements"
-              exit 1
-            fi
-          fi
+          # Run the build process
+          npm run build
           
           # Verify build output exists
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
             echo "❌ Build directory is missing or empty"
+            ls -la dist/ || echo "dist directory doesn't exist"
             exit 1
           fi
           
           echo "✅ Build verification completed"
+          echo "📦 Build contents:"
+          ls -la dist/
 
       - name: 📦 Create extension package
         run: |
@@ -213,7 +208,7 @@ jobs:
     name: 🔒 Security Scan
     runs-on: ubuntu-latest
     needs: preflight
-    if: always() && (needs.preflight.outputs.should_run == 'true' || needs.preflight.result == 'skipped')
+    if: needs.preflight.result == 'success' && needs.preflight.outputs.should_run == 'true'
     timeout-minutes: 10
     permissions:
       security-events: write
