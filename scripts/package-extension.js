@@ -286,7 +286,7 @@ if (require.main === module) {
   // Check if archiver is available, install if needed
   try {
     require('archiver')
-  } catch (error) {
+  } catch (_error) {
     console.log('📦 Installing archiver dependency...')
     const { execSync } = require('child_process')
     execSync('npm install archiver --save-dev', { stdio: 'inherit' })

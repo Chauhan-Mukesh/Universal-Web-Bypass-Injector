@@ -9,15 +9,15 @@
     "contextMenus",
     "tabs",
     "storage",
-    "notifications"
+    "notifications",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
   "optional_permissions": [
-    "background",
-    "declarativeNetRequest"
+    "background"
   ],
   "content_scripts": [
     {
@@ -37,17 +37,17 @@
     "default_popup": "popup.html",
     "default_title": "Universal Web Bypass Injector - Click to view status and controls",
     "default_icon": {
-      "16": "logo.png",
-      "32": "logo.png",
-      "48": "logo.png",
-      "128": "logo.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
   "icons": {
-    "16": "logo.png",
-    "32": "logo.png",
-    "48": "logo.png",
-    "128": "logo.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "web_accessible_resources": [
     {

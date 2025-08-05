@@ -121,7 +121,7 @@ const BackgroundService = {
           message: 'Extension installed! Your browsing experience is now enhanced with ad and paywall blocking.'
         })
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently handle notification errors
       console.log('[UWB Background] Notifications not available')
     }
@@ -158,7 +158,7 @@ const BackgroundService = {
       const prevMajor = parseInt(prev.split('.')[0], 10)
       const currMajor = parseInt(curr.split('.')[0], 10)
       return currMajor > prevMajor
-    } catch (error) {
+    } catch (_error) {
       return false
     }
   },
@@ -344,7 +344,7 @@ const BackgroundService = {
 
       const protocol = new URL(url).protocol
       return protocol === 'http:' || protocol === 'https:'
-    } catch (error) {
+    } catch (_error) {
       return false
     }
   },
