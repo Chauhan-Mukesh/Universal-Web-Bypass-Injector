@@ -35,6 +35,7 @@ A professional-grade Chrome extension that automatically bypasses ads, tracking 
 - **🔓 Improved Paywall Bypass**: Better detection and removal of subscription walls and content gates
 - **📊 Graceful Content Handling**: Smart fallback suggestions for restricted content with Internet Archive links
 - **🚫 Advanced Anti-Adblock**: Enhanced circumvention of "disable your adblocker" dialogs
+- **⚡ Performance Optimization**: Optimized DOM cleaning for large pages (5,000+ nodes) - now <1000ms
 - **📦 Automated Packaging**: Improved build system for Chrome Store deployment
 
 ### New Enhanced Interface
@@ -354,6 +355,16 @@ git push origin v1.2.3  # Trigger automated release
 - **Network Overhead**: Minimal (only blocks, doesn't add requests)
 - **Page Load Impact**: 0-5ms additional load time
 - **Battery Impact**: Negligible on mobile devices
+- **Large DOM Handling**: < 1000ms for pages with 5,000+ nodes
+- **DOM Cleaning Performance**: Optimized for real-world websites
+
+#### Performance Optimizations (v2.0.1)
+- **🚀 Enhanced DOM Cleaning**: Improved performance for large pages
+- **⚡ Batched Operations**: Reduced DOM reflows and improved efficiency
+- **🎯 Targeted Selectors**: Optimized CSS selector usage for faster detection
+- **📊 Performance Monitoring**: Built-in performance tracking and logging
+
+See [PERFORMANCE.md](./PERFORMANCE.md) for detailed performance guidelines and benchmarks.
 
 ### Architecture
 - **Service Worker**: Background processing with event-driven architecture

@@ -330,6 +330,18 @@
     cleanupTimeout: null,
 
     /**
+     * Last mutation observer execution time for throttling.
+     * @type {number}
+     */
+    lastMutationTime: 0,
+
+    /**
+     * Mutation observer throttle interval (ms).
+     * @type {number}
+     */
+    mutationThrottleInterval: 200,
+
+    /**
      * Element logging per site for diagnostics.
      * @type {Array<Object>}
      */
@@ -894,11 +906,17 @@
      * @private
      */
     _cleanDOMOptimized(isProtected) {
+      const startTime = performance.now()
       let removedCount = 0
+      const nodeCount = document.querySelectorAll('*').length
       
       try {
-        if (isProtected) {
-          // Ultra-conservative cleaning for protected sites - only most obvious elements
+        // Performance budget check for very large DOMs
+        if (nodeCount > 10000) {
+          this._log(`Warning: Large DOM detected (${nodeCount} nodes). Using minimal cleaning for performance.`)
+          removedCount += this._cleanDOMMinimal()
+        } else if (isProtected) {
+          // Ultra-conservative cleaning for protected sites
           const elements = document.querySelectorAll('.adblock-overlay, .paywall-overlay, [data-ad-container]')
           for (let i = 0; i < elements.length; i++) {
             const element = elements[i]
@@ -916,11 +934,22 @@
           this._removeAdblockDialogs()
         }
         
+        const endTime = performance.now()
+        const duration = Math.round(endTime - startTime)
+        
+        // Performance monitoring and reporting
+        if (duration > 1000) {
+          this._logError('Performance Budget Exceeded', new Error(`DOM size: ${nodeCount} nodes — processing time: ${duration} ms (budget: 1000 ms)`))
+        }
+        
         if (removedCount > 0) {
-          this._log(`Cleaned ${removedCount} elements from DOM`)
+          this._log(`Cleaned ${removedCount} elements from DOM (${nodeCount} nodes) in ${duration}ms`)
         }
       } catch (error) {
+        const endTime = performance.now()
+        const duration = Math.round(endTime - startTime)
         this._logError('cleanDOMOptimized', error)
+        this._log(`DOM cleaning failed after ${duration}ms for ${nodeCount} nodes`)
       }
     },
 
@@ -1627,10 +1656,28 @@
 
         this.observer = new MutationObserver((mutations) => {
           try {
+            const now = Date.now()
+            
+            // Throttle mutations for performance on rapidly changing pages
+            if (now - this.lastMutationTime < this.mutationThrottleInterval) {
+              return
+            }
+            
+            this.lastMutationTime = now
+            
             let shouldClean = false
             const addedNodes = []
+            let mutationCount = 0
 
             for (const mutation of mutations) {
+              mutationCount++
+              
+              // Limit processing for very large mutation sets
+              if (mutationCount > 50) {
+                this._log('Large mutation set detected, limiting processing for performance')
+                break
+              }
+              
               if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                 mutation.addedNodes.forEach(node => {
                   if (node.nodeType === Node.ELEMENT_NODE) {
