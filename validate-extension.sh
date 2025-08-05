@@ -92,6 +92,14 @@ else
     echo "  ⚠️  Icons directory is missing"
 fi
 
+# Check for logo.png (new requirement)
+if [ -f "logo.png" ]; then
+    echo "  ✅ logo.png exists (required by manifest)"
+else
+    echo "  ⚠️  logo.png is missing - extension will not load properly"
+    echo "    Please ensure logo.png is present in the root directory"
+fi
+
 # Validate JavaScript syntax
 echo "🔧 Validating JavaScript syntax..."
 js_files=("content.js" "background.js" "popup.js")

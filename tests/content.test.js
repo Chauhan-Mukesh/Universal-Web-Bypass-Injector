@@ -179,7 +179,7 @@ describe('UniversalBypass Content Script', () => {
     test('should suppress console messages matching patterns', () => {
       const originalConsoleError = console.error
       const capturedMessages = []
-      
+
       // Mock console.error to capture messages
       console.error = jest.fn((...args) => {
         capturedMessages.push(args.join(' '))
@@ -281,7 +281,7 @@ describe('UniversalBypass Content Script', () => {
       }
 
       const mockAppendChild = jest.fn()
-      
+
       document.createElement = jest.fn(() => mockStyle)
       document.getElementById = jest.fn(() => null)
       document.head = {

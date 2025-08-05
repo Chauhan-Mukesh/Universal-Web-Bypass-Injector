@@ -10,7 +10,7 @@ describe('Background Service', () => {
 
     // Reset chrome.runtime.getManifest mock
     chrome.runtime.getManifest.mockReturnValue({ version: '2.0.0' })
-    
+
     // Ensure mocks are ready
     chrome.runtime.onInstalled.addListener.mockClear()
     chrome.action.onClicked.addListener.mockClear()

@@ -272,7 +272,7 @@ describe('Extension Integration Tests', () => {
 
       restrictedUrls.forEach(url => {
         const parsedUrl = new URL(url)
-        
+
         // Mock window.location without triggering navigation
         Object.defineProperty(global.window, 'location', {
           value: {

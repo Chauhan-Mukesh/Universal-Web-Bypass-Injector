@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "description": "Universal ad-blocker and paywall bypass extension that removes tracking scripts, overlays, and paywalls from websites.",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "jest --detectOpenHandles",
+    "test:watch": "jest --watch --detectOpenHandles",
+    "test:coverage": "jest --coverage --detectOpenHandles",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "npm run lint && npm run test",
-    "validate": "npm run lint && npm run test && npm run test:extension"
+    "build": "npm run lint && npm run test:coverage",
+    "validate": "npm run lint && npm run test && npm run test:extension",
+    "validate:quick": "npm run lint && node -e \"console.log('Quick validation passed')\""
   },
   "devDependencies": {
     "@types/chrome": "^0.0.246",
