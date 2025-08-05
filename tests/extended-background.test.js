@@ -107,6 +107,66 @@ describe('BackgroundService Extended Tests', () => {
       )
     })
 
+    test('should handle notification callback with error gracefully', async() => {
+      // Mock chrome.runtime.getURL for the notification
+      chrome.runtime.getURL = jest.fn(() => 'chrome-extension://test/icons/icon48.png')
+      
+      // Mock notification creation with error callback
+      chrome.notifications.create.mockImplementation((options, callback) => {
+        // Simulate runtime error
+        chrome.runtime.lastError = { message: 'Icon could not be loaded' }
+        callback('notification-id')
+        // Clear the error after callback
+        delete chrome.runtime.lastError
+      })
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
+      
+      // Call the welcome notification function
+      BackgroundService.showWelcomeNotification()
+      
+      // Wait a bit for any async operations
+      await new Promise(resolve => setTimeout(resolve, 10))
+      
+      // Verify notification was created and error was handled
+      expect(chrome.notifications.create).toHaveBeenCalled()
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[UWB Background] Notification creation failed:',
+        'Icon could not be loaded'
+      )
+      
+      consoleSpy.mockRestore()
+    })
+
+    test('should handle notification callback without error', async() => {
+      // Mock chrome.runtime.getURL for the notification
+      chrome.runtime.getURL = jest.fn(() => 'chrome-extension://test/icons/icon48.png')
+      
+      // Mock successful notification creation
+      chrome.notifications.create.mockImplementation((options, callback) => {
+        // No runtime error
+        delete chrome.runtime.lastError
+        callback('notification-id-123')
+      })
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+      
+      // Call the welcome notification function
+      BackgroundService.showWelcomeNotification()
+      
+      // Wait a bit for any async operations
+      await new Promise(resolve => setTimeout(resolve, 10))
+      
+      // Verify notification was created and success was logged
+      expect(chrome.notifications.create).toHaveBeenCalled()
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[UWB Background] Welcome notification created:',
+        'notification-id-123'
+      )
+      
+      consoleSpy.mockRestore()
+    })
+
     test('should handle update event', async() => {
       await BackgroundService.init()
       const installHandler = chrome.runtime.onInstalled.addListener.mock.calls[0][0]
