@@ -67,34 +67,34 @@ const DANGEROUS_PERMISSIONS = [
   { permission: 'cookies', severity: 'medium', reason: 'Can access cookies' }
 ]
 
-let securityIssues = []
+const securityIssues = []
 
 /**
  * 🔍 Scan files for security patterns
  */
 function scanForSecurityPatterns() {
   console.log('🔍 Scanning for security patterns...')
-  
+
   const jsFiles = [
     'background.js',
     'content.js',
     'popup.js'
   ]
-  
+
   jsFiles.forEach(file => {
     const filePath = path.join(CONFIG.sourceDir, file)
-    
+
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf8')
-      
+
       SECURITY_PATTERNS.forEach(pattern => {
         const matches = content.match(pattern.pattern)
-        
+
         if (matches) {
           matches.forEach(match => {
             securityIssues.push({
               type: 'security-pattern',
-              file: file,
+              file,
               pattern: pattern.description,
               match: match.trim(),
               severity: pattern.severity,
@@ -106,7 +106,7 @@ function scanForSecurityPatterns() {
       })
     }
   })
-  
+
   console.log(`✅ Pattern scanning completed (${securityIssues.length} issues found)`)
 }
 
@@ -123,7 +123,7 @@ function getLineNumber(content, match) {
  */
 function checkManifestSecurity() {
   console.log('🔐 Checking manifest security...')
-  
+
   if (!fs.existsSync(CONFIG.manifestPath)) {
     securityIssues.push({
       type: 'manifest-missing',
@@ -132,30 +132,30 @@ function checkManifestSecurity() {
     })
     return
   }
-  
+
   const manifest = JSON.parse(fs.readFileSync(CONFIG.manifestPath, 'utf8'))
-  
+
   // Check permissions
   const permissions = manifest.permissions || []
   const hostPermissions = manifest.host_permissions || []
-  
+
   const allPermissions = [...permissions, ...hostPermissions]
   allPermissions.forEach(permission => {
-    const dangerousPermission = DANGEROUS_PERMISSIONS.find(p => 
+    const dangerousPermission = DANGEROUS_PERMISSIONS.find(p =>
       permission.includes(p.permission)
     )
-    
+
     if (dangerousPermission) {
       securityIssues.push({
         type: 'dangerous-permission',
-        permission: permission,
+        permission,
         severity: dangerousPermission.severity,
         reason: dangerousPermission.reason,
         category: 'permissions'
       })
     }
   })
-  
+
   // Check Content Security Policy
   const csp = manifest.content_security_policy
   if (!csp) {
@@ -168,7 +168,7 @@ function checkManifestSecurity() {
   } else {
     // Check for unsafe CSP directives
     const cspString = typeof csp === 'string' ? csp : JSON.stringify(csp)
-    
+
     if (cspString.includes('unsafe-inline')) {
       securityIssues.push({
         type: 'unsafe-csp',
@@ -177,7 +177,7 @@ function checkManifestSecurity() {
         category: 'csp'
       })
     }
-    
+
     if (cspString.includes('unsafe-eval')) {
       securityIssues.push({
         type: 'unsafe-csp',
@@ -187,7 +187,7 @@ function checkManifestSecurity() {
       })
     }
   }
-  
+
   console.log('✅ Manifest security check completed')
 }
 
@@ -196,24 +196,24 @@ function checkManifestSecurity() {
  */
 function checkDependencySecurity() {
   console.log('📦 Checking dependency security...')
-  
+
   try {
     // Run npm audit
-    const auditResult = execSync('npm audit --json', { 
+    const auditResult = execSync('npm audit --json', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     })
-    
+
     const audit = JSON.parse(auditResult)
-    
+
     if (audit.metadata && audit.metadata.vulnerabilities) {
       const vulns = audit.metadata.vulnerabilities
-      
+
       Object.keys(vulns).forEach(severity => {
         if (vulns[severity] > 0) {
           securityIssues.push({
             type: 'dependency-vulnerability',
-            severity: severity,
+            severity,
             count: vulns[severity],
             description: `${vulns[severity]} ${severity} dependency vulnerabilities`,
             category: 'dependencies'
@@ -221,7 +221,6 @@ function checkDependencySecurity() {
         }
       })
     }
-    
   } catch (error) {
     console.warn('⚠️ Could not run npm audit:', error.message)
     securityIssues.push({
@@ -231,7 +230,7 @@ function checkDependencySecurity() {
       category: 'dependencies'
     })
   }
-  
+
   console.log('✅ Dependency security check completed')
 }
 
@@ -240,7 +239,7 @@ function checkDependencySecurity() {
  */
 function checkForSensitiveFiles() {
   console.log('🔍 Checking for sensitive files...')
-  
+
   const sensitiveFiles = [
     '.env',
     '.env.local',
@@ -251,19 +250,19 @@ function checkForSensitiveFiles() {
     '.htpasswd',
     'password.txt'
   ]
-  
+
   sensitiveFiles.forEach(file => {
     if (fs.existsSync(path.join(CONFIG.sourceDir, file))) {
       securityIssues.push({
         type: 'sensitive-file',
-        file: file,
+        file,
         severity: 'high',
         description: `Sensitive file found: ${file}`,
         category: 'files'
       })
     }
   })
-  
+
   console.log('✅ Sensitive file check completed')
 }
 
@@ -272,7 +271,7 @@ function checkForSensitiveFiles() {
  */
 function generateSecurityReport() {
   console.log('📊 Generating security report...')
-  
+
   const report = {
     summary: {
       total_issues: securityIssues.length,
@@ -285,7 +284,7 @@ function generateSecurityReport() {
     issues_by_category: {},
     issues: securityIssues
   }
-  
+
   // Group issues by category
   securityIssues.forEach(issue => {
     const category = issue.category || 'other'
@@ -294,18 +293,18 @@ function generateSecurityReport() {
     }
     report.issues_by_category[category].push(issue)
   })
-  
+
   // Write report to file
   const reportPath = path.join(CONFIG.sourceDir, 'security-report.json')
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
-  
+
   console.log('📊 Security Report Summary:')
   console.log(`  🔍 Total Issues: ${report.summary.total_issues}`)
   console.log(`  🚨 Critical: ${report.summary.critical}`)
   console.log(`  ⚠️  High: ${report.summary.high}`)
   console.log(`  📋 Medium: ${report.summary.medium}`)
   console.log(`  ℹ️  Low: ${report.summary.low}`)
-  
+
   return report
 }
 
@@ -315,7 +314,7 @@ function generateSecurityReport() {
 function displayCriticalIssues() {
   const criticalIssues = securityIssues.filter(i => i.severity === 'critical')
   const highIssues = securityIssues.filter(i => i.severity === 'high')
-  
+
   if (criticalIssues.length > 0) {
     console.log('\n🚨 CRITICAL SECURITY ISSUES:')
     criticalIssues.forEach((issue, index) => {
@@ -325,7 +324,7 @@ function displayCriticalIssues() {
       if (issue.match) console.log(`     🔍 Match: ${issue.match}`)
     })
   }
-  
+
   if (highIssues.length > 0) {
     console.log('\n⚠️ HIGH PRIORITY ISSUES:')
     highIssues.forEach((issue, index) => {
@@ -341,21 +340,21 @@ function displayCriticalIssues() {
 function runSecurityCheck() {
   console.log('🔒 Starting comprehensive security check...')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  
+
   try {
     scanForSecurityPatterns()
     checkManifestSecurity()
     checkDependencySecurity()
     checkForSensitiveFiles()
-    
+
     const report = generateSecurityReport()
     displayCriticalIssues()
-    
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    
+
     const criticalCount = report.summary.critical
     const highCount = report.summary.high
-    
+
     if (criticalCount > 0) {
       console.log('❌ Security check FAILED - Critical issues found!')
       process.exit(1)
@@ -367,7 +366,6 @@ function runSecurityCheck() {
       console.log('✅ Security check PASSED - No critical issues found!')
       process.exit(0)
     }
-    
   } catch (error) {
     console.error('❌ Security check failed:', error.message)
     process.exit(1)

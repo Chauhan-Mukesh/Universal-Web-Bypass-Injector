@@ -56,9 +56,9 @@ function removeFile(file) {
  */
 function clean() {
   console.log('🧹 Starting cleanup...')
-  
+
   let removedCount = 0
-  
+
   // Clean directories
   CONFIG.dirsToClean.forEach(dir => {
     const fullPath = path.join(CONFIG.sourceDir, dir)
@@ -66,7 +66,7 @@ function clean() {
       removedCount++
     }
   })
-  
+
   // Clean files
   CONFIG.filesToClean.forEach(pattern => {
     const fullPath = path.join(CONFIG.sourceDir, pattern)
@@ -74,7 +74,7 @@ function clean() {
       removedCount++
     }
   })
-  
+
   console.log(`✅ Cleanup completed (${removedCount} items removed)`)
 }
 
