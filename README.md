@@ -27,12 +27,20 @@ A professional-grade Chrome extension that automatically bypasses ads, tracking 
 | **Code Quality** | ✅ ESLint clean |
 | **Dependencies** | ✅ Up to date |
 
-## 🆕 Version 2.0.0 - Major Update
+## 🆕 Version 2.0.1 - Enhanced Ad Blocking & Paywall Bypass
+
+### Latest Improvements ✨
+- **🔧 Fixed Statistics Error**: Resolved "ERR_FILE_NOT_FOUND" when accessing detailed statistics
+- **🛡️ Enhanced Ad Blocking**: Integrated 80+ blocking patterns from EasyList and uBlock Origin filters
+- **🔓 Improved Paywall Bypass**: Better detection and removal of subscription walls and content gates
+- **📊 Graceful Content Handling**: Smart fallback suggestions for restricted content with Internet Archive links
+- **🚫 Advanced Anti-Adblock**: Enhanced circumvention of "disable your adblocker" dialogs
+- **📦 Automated Packaging**: Improved build system for Chrome Store deployment
 
 ### New Enhanced Interface
 ![Popup Interface](https://github.com/user-attachments/assets/8c124e79-7ffa-4b0d-b7a7-03ed55d8f365)
 
-This major update brings significant improvements in code quality, performance, testing, and user experience.
+This major update brings significant improvements in ad blocking effectiveness, paywall bypass capabilities, and user experience.
 
 ## 🚀 Features
 
@@ -54,33 +62,44 @@ This major update brings significant improvements in code quality, performance, 
 - **Advanced UI**: Modern, responsive popup interface with keyboard shortcuts
 - **Background Statistics**: Real-time tracking of blocked content and active sessions
 
-## 🛡️ What Gets Blocked
+### What Gets Blocked (Enhanced v2.0.1)
 
-### Tracking & Analytics Services
-- Google Analytics & Tag Manager
-- Facebook Pixel & Connect
-- Twitter Analytics & Ads
-- TikTok Analytics
-- Adobe Analytics
-- Chartbeat & Comscore
-- Sentry & Optimizely
-- And 40+ more tracking services
+### Tracking & Analytics Services (80+ patterns)
+- Google Analytics & Tag Manager, Universal Analytics
+- Facebook Pixel & Connect, Meta tracking
+- Twitter Analytics & Ads, X.com tracking
+- TikTok Analytics & Pixel tracking
+- Adobe Analytics & Omniture
+- Chartbeat, Comscore & Nielsen
+- Sentry, Optimizely & AB testing platforms
+- **Enhanced Coverage**: HotJar, FullStory, Mixpanel, Segment, Amplitude
+- **User Session Recording**: Heap.io, MouseFlow, CrazyEgg, SmartLook, LogRocket
+- **Performance Monitoring**: New Relic, Pingdom, Quantum Metric
+- And 60+ more tracking services
 
-### Ad Networks
-- Google AdSense & DoubleClick
-- Amazon Advertising System
-- Outbrain & Taboola
-- Criteo & PubMatic
-- Reddit Ads
+### Ad Networks & Exchanges (Comprehensive Coverage)
+- Google AdSense, DoubleClick & Google Ads
+- Amazon Advertising System & DSP
+- Outbrain, Taboola & Content Recommendation
+- Criteo, PubMatic & Header Bidding
+- **Enhanced Ad Exchanges**: AppNexus, Rubicon Project, OpenX, Index Exchange
+- **Supply Side Platforms**: Smart AdServer, Sovrn, ShareThrough, Teads
+- **Data Management**: LiveRamp, BidSwitch, Real-time bidding platforms
+- Reddit Ads, LinkedIn Ads, Pinterest Ads, Snapchat Ads
 - And dozens of other ad networks
 
-### Common Overlays & Restrictions
-- Paywall overlays & subscription walls
-- Ad-block detection popups
-- Newsletter signup modals
-- Cookie consent banners
-- Age verification overlays
-- High z-index modal overlays
+### Privacy & Compliance Trackers
+- Cookie consent banners (OneTrust, CookieLaw, TrustArc)
+- GDPR compliance tracking
+- Privacy policy enforcement scripts
+- User consent management platforms
+
+### Anti-Adblock & Paywall Systems
+- **Enhanced Detection**: FuckAdBlock, BlockAdBlock, Anti-Adblock scripts
+- **Paywall Bypass**: Piano templates, subscription walls, meter paywalls
+- **Content Gates**: Login walls, email capture modals, newsletter signups
+- **Overlay Removal**: High z-index overlays, blur filters, backdrop modals
+- **Access Barriers**: Premium content overlays, membership paywalls
 
 ## 📦 Installation
 
@@ -445,17 +464,15 @@ This extension is designed to improve user experience and privacy while browsing
 
 ## 🗂️ Version History
 
-### v2.0.0 (Current) - Professional Grade Release
-- 🎨 **Complete UI overhaul** with modern, responsive design
-- 📚 **Professional documentation** with JSDoc and Sonar standards
-- 🧪 **Comprehensive testing** suite with 95%+ code coverage
-- 🚀 **Performance improvements** and memory optimization
-- 🛡️ **Enhanced security** with better error handling
-- 🔧 **Advanced background service** with statistics tracking
-- ⌨️ **Keyboard shortcuts** and accessibility improvements
-- 🎯 **Smart blocking rules** with 50+ new tracker patterns
-- 🔄 **Auto-permission management** for seamless operation
-- 📊 **Real-time statistics** and activity monitoring
+### v2.0.1 (Current) - Enhanced Ad Blocking & Paywall Bypass
+- 🔧 **Fixed Statistics Access**: Resolved ERR_FILE_NOT_FOUND error for statistics page
+- 🛡️ **Enhanced Ad Blocking**: 80+ new blocking patterns from EasyList/uBlock Origin
+- 🔓 **Improved Paywall Bypass**: Advanced detection of subscription walls and content gates
+- 📊 **Smart Content Handling**: Graceful fallback with Internet Archive suggestions
+- 🚫 **Advanced Anti-Adblock**: Better circumvention of "disable adblocker" messages
+- 📦 **Automated Build System**: Enhanced packaging for Chrome Store deployment
+- 🎯 **Better DOM Targeting**: Enhanced selectors for modal overlays and paywalls
+- 🔍 **Comprehensive Tracking**: Extended coverage of analytics and user tracking scripts
 
 ### v1.0.0
 - Initial release as Chrome extension

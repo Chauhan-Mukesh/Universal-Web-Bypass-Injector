@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Universal Web Bypass Injector",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Professional-grade ad-blocker and paywall bypass extension that removes tracking scripts, overlays, and paywalls from websites with enhanced performance and reliability.",
   "permissions": [
     "activeTab",

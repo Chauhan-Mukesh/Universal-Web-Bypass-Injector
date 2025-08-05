@@ -24,6 +24,8 @@ const INCLUDE_FILES = [
   'content.js',
   'popup.js',
   'popup.html',
+  'statistics.html',
+  'statistics.js',
   'logo.png'
 ]
 
@@ -165,7 +167,7 @@ function optimizeForProduction() {
   console.log('🚀 Applying production optimizations...')
 
   // Remove debug code from JavaScript files
-  const jsFiles = ['background.js', 'content.js', 'popup.js']
+  const jsFiles = ['background.js', 'content.js', 'popup.js', 'statistics.js']
 
   jsFiles.forEach(file => {
     const filePath = path.join(CONFIG.buildDir, file)
