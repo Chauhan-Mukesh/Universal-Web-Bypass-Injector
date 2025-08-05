@@ -50,7 +50,7 @@ describe('StatisticsController Comprehensive Tests', () => {
 
     mockWindow = {
       location: { href: 'chrome-extension://test/statistics.html' },
-      setInterval: jest.fn((callback, interval) => {
+      setInterval: jest.fn((callback, _interval) => {
         // Execute callback immediately for testing
         setTimeout(callback, 0)
         return 12345 // Mock interval ID

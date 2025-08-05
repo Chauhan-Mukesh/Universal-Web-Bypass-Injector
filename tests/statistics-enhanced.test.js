@@ -306,7 +306,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
 
   // Test chrome extension specific functionality
   describe('Chrome Extension Coverage', () => {
-    test('should handle sendMessage chrome runtime errors', async () => {
+    test('should handle sendMessage chrome runtime errors', async() => {
       chrome.runtime.lastError = { message: 'Runtime error' }
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
         if (cb) cb(null)
@@ -316,13 +316,13 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
         .rejects.toThrow('Runtime error')
     })
 
-    test('should handle sendMessage success', async () => {
+    test('should handle sendMessage success', async() => {
       chrome.runtime.lastError = null
       const response = await StatisticsController.sendMessage({ action: 'test' })
       expect(response).toHaveProperty('total')
     })
 
-    test('should handle enableSite functionality', async () => {
+    test('should handle enableSite functionality', async() => {
       chrome.runtime.sendMessage
         .mockImplementationOnce((msg, cb) => cb({ success: true }))
         .mockImplementationOnce((msg, cb) => cb({ total: 100 }))
@@ -335,7 +335,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       }, expect.any(Function))
     })
 
-    test('should handle enableSite errors', async () => {
+    test('should handle enableSite errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => cb({ error: 'Failed' }))
       
       await StatisticsController.enableSite('example.com')
@@ -358,7 +358,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error exporting data:', expect.any(Error))
     })
 
-    test('should handle resetStatistics with confirmation', async () => {
+    test('should handle resetStatistics with confirmation', async() => {
       global.window.confirm.mockReturnValue(true)
       chrome.runtime.sendMessage
         .mockImplementationOnce((msg, cb) => cb({ success: true }))
@@ -369,7 +369,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'resetStats' }, expect.any(Function))
     })
 
-    test('should not reset without confirmation', async () => {
+    test('should not reset without confirmation', async() => {
       global.window.confirm.mockReturnValue(false)
       
       await StatisticsController.resetStatistics()
@@ -377,7 +377,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       // Should not send reset message
     })
 
-    test('should handle resetStatistics errors', async () => {
+    test('should handle resetStatistics errors', async() => {
       global.window.confirm.mockReturnValue(true)
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => cb({ error: 'Reset failed' }))
       
@@ -385,7 +385,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error resetting statistics:', expect.any(Error))
     })
 
-    test('should handle refreshData', async () => {
+    test('should handle refreshData', async() => {
       const mockRefreshBtn = { textContent: '', disabled: false }
       StatisticsController.elements = { refreshBtn: mockRefreshBtn }
       
@@ -393,7 +393,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalled()
     })
 
-    test('should handle refreshData errors', async () => {
+    test('should handle refreshData errors', async() => {
       const mockRefreshBtn = { textContent: '', disabled: false }
       StatisticsController.elements = { refreshBtn: mockRefreshBtn }
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => cb({ error: 'Refresh failed' }))
@@ -402,12 +402,12 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error refreshing data:', expect.any(Error))
     })
 
-    test('should handle loadStatistics', async () => {
+    test('should handle loadStatistics', async() => {
       await StatisticsController.loadStatistics()
       expect(StatisticsController.data).toBeDefined()
     })
 
-    test('should handle loadStatistics errors', async () => {
+    test('should handle loadStatistics errors', async() => {
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => cb({ error: 'Load failed' }))
       
       await StatisticsController.loadStatistics()
@@ -417,12 +417,12 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
 
   // Test initialization and error paths
   describe('Initialization Coverage', () => {
-    test('should handle init success', async () => {
+    test('should handle init success', async() => {
       await StatisticsController.init()
       expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Initialized successfully')
     })
 
-    test('should handle init errors', async () => {
+    test('should handle init errors', async() => {
       const originalCacheElements = StatisticsController.cacheElements
       StatisticsController.cacheElements = jest.fn(() => { throw new Error('Cache failed') })
       
