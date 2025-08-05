@@ -1,6 +1,6 @@
 {
   "name": "universal-web-bypass-injector",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Universal ad-blocker and paywall bypass extension that removes tracking scripts, overlays, and paywalls from websites.",
   "scripts": {
     "test": "jest --detectOpenHandles",
@@ -84,5 +84,13 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector"
+  },
+  "homepage": "https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme",
+  "bugs": {
+    "url": "https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }
