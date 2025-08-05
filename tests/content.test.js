@@ -1,0 +1,370 @@
+/**
+ * @file Content Script Tests
+ * @description Comprehensive tests for the Universal Bypass content script
+ */
+
+// Mock DOM elements and methods
+global.document = {
+  readyState: 'complete',
+  documentElement: {
+    querySelectorAll: jest.fn(() => []),
+    querySelector: jest.fn(() => null)
+  },
+  getElementById: jest.fn(() => null),
+  createElement: jest.fn(() => ({
+    id: '',
+    textContent: '',
+    setAttribute: jest.fn(),
+    appendChild: jest.fn()
+  })),
+  head: {
+    appendChild: jest.fn()
+  },
+  querySelectorAll: jest.fn(() => []),
+  addEventListener: jest.fn()
+}
+
+global.window = {
+  location: {
+    protocol: 'https:',
+    href: 'https://example.com',
+    hostname: 'example.com'
+  },
+  innerHeight: 768,
+  getComputedStyle: jest.fn(() => ({
+    position: 'static',
+    zIndex: '1'
+  })),
+  addEventListener: jest.fn(),
+  setTimeout: global.setTimeout,
+  clearTimeout: global.clearTimeout
+}
+
+global.Node = {
+  ELEMENT_NODE: 1
+}
+
+// Load the content script
+require('../content.js')
+
+describe('UniversalBypass Content Script', () => {
+  let UniversalBypass
+
+  beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks()
+
+    // Get the UniversalBypass object from global scope
+    UniversalBypass = global.window.UniversalBypass
+
+    // Reset initialization state
+    if (UniversalBypass) {
+      UniversalBypass.initialized = false
+      UniversalBypass.DEBUG = false
+    }
+  })
+
+  afterEach(() => {
+    if (UniversalBypass && UniversalBypass.destroy) {
+      UniversalBypass.destroy()
+    }
+  })
+
+  describe('Initialization', () => {
+    test('should initialize successfully', async() => {
+      expect(UniversalBypass).toBeDefined()
+      expect(typeof UniversalBypass.init).toBe('function')
+
+      await UniversalBypass.init()
+      expect(UniversalBypass.initialized).toBe(true)
+    })
+
+    test('should not initialize twice', async() => {
+      await UniversalBypass.init()
+      expect(UniversalBypass.initialized).toBe(true)
+
+      const logSpy = jest.spyOn(UniversalBypass, '_log')
+      await UniversalBypass.init()
+
+      expect(logSpy).toHaveBeenCalledWith('Already initialized, skipping...')
+    })
+
+    test('should handle initialization errors gracefully', async() => {
+      const errorSpy = jest.spyOn(UniversalBypass, '_logError')
+
+      // Mock an error in one of the init methods
+      const originalMethod = UniversalBypass.patchNetworkRequests
+      UniversalBypass.patchNetworkRequests = jest.fn(() => {
+        throw new Error('Test error')
+      })
+
+      await UniversalBypass.init()
+
+      expect(errorSpy).toHaveBeenCalledWith('init', expect.any(Error))
+
+      // Restore original method
+      UniversalBypass.patchNetworkRequests = originalMethod
+    })
+  })
+
+  describe('URL Blocking', () => {
+    test('should identify blocked hosts correctly', () => {
+      const blockedUrls = [
+        'https://analytics.google.com/track',
+        'https://securepubads.g.doubleclick.net/ads',
+        'https://connect.facebook.net/pixel',
+        'http://sub.analytics.google.com/script.js'
+      ]
+
+      const allowedUrls = [
+        'https://example.com/content',
+        'https://cdn.example.com/app.js',
+        'https://api.example.com/data'
+      ]
+
+      blockedUrls.forEach(url => {
+        expect(UniversalBypass._isBlocked(url)).toBe(true)
+      })
+
+      allowedUrls.forEach(url => {
+        expect(UniversalBypass._isBlocked(url)).toBe(false)
+      })
+    })
+
+    test('should handle invalid URLs gracefully', () => {
+      expect(UniversalBypass._isBlocked(null)).toBe(false)
+      expect(UniversalBypass._isBlocked(undefined)).toBe(false)
+      expect(UniversalBypass._isBlocked('')).toBe(false)
+      expect(UniversalBypass._isBlocked(123)).toBe(false)
+    })
+  })
+
+  describe('Element Removal', () => {
+    test('should remove elements safely', () => {
+      const mockElement = {
+        remove: jest.fn(),
+        parentNode: true
+      }
+
+      const result = UniversalBypass._removeElement(mockElement)
+      expect(result).toBe(true)
+      expect(mockElement.remove).toHaveBeenCalled()
+    })
+
+    test('should handle removal errors gracefully', () => {
+      const mockElement = {
+        remove: jest.fn(() => {
+          throw new Error('Removal failed')
+        }),
+        parentNode: true
+      }
+
+      const result = UniversalBypass._removeElement(mockElement)
+      expect(result).toBe(false)
+    })
+
+    test('should not remove elements without parentNode', () => {
+      const mockElement = {
+        remove: jest.fn(),
+        parentNode: null
+      }
+
+      const result = UniversalBypass._removeElement(mockElement)
+      expect(result).toBe(false)
+      expect(mockElement.remove).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Console Noise Suppression', () => {
+    test('should suppress console messages matching patterns', () => {
+      const originalConsoleError = console.error
+      console.error = jest.fn()
+
+      UniversalBypass.suppressConsoleNoise()
+
+      // These should be suppressed
+      console.error('net::ERR_BLOCKED_BY_CLIENT: request blocked')
+      console.error('Failed to load resource: net::ERR_BLOCKED_BY_CLIENT')
+
+      // This should not be suppressed
+      console.error('Important error message')
+
+      expect(console.error).toHaveBeenCalledTimes(1)
+      expect(console.error).toHaveBeenCalledWith('Important error message')
+
+      console.error = originalConsoleError
+    })
+  })
+
+  describe('Network Request Patching', () => {
+    test('should patch fetch to block requests', () => {
+      const originalFetch = global.fetch
+      global.window.fetch = jest.fn()
+
+      UniversalBypass.patchNetworkRequests()
+
+      // Test blocked request
+      const blockedUrl = 'https://analytics.google.com/track'
+      const fetchPromise = global.window.fetch(blockedUrl)
+
+      expect(fetchPromise).rejects.toThrow('Bypassed fetch to')
+
+      global.fetch = originalFetch
+    })
+
+    test('should not patch fetch multiple times', () => {
+      global.window.fetch = jest.fn()
+      global.window.fetch._bypassed = false
+
+      UniversalBypass.patchNetworkRequests()
+      expect(global.window.fetch._bypassed).toBe(true)
+
+      const originalFetch = global.window.fetch
+      UniversalBypass.patchNetworkRequests()
+
+      // Should not be re-patched
+      expect(global.window.fetch).toBe(originalFetch)
+    })
+  })
+
+  describe('DOM Cleaning', () => {
+    test('should clean DOM elements matching selectors', () => {
+      const mockElement = {
+        matches: jest.fn(() => true),
+        querySelectorAll: jest.fn(() => []),
+        remove: jest.fn(),
+        parentNode: true,
+        nodeType: 1
+      }
+
+      document.documentElement.querySelectorAll = jest.fn(() => [mockElement])
+
+      UniversalBypass.cleanDOM()
+
+      expect(mockElement.matches).toHaveBeenCalled()
+    })
+
+    test('should handle DOM cleaning errors gracefully', () => {
+      const errorSpy = jest.spyOn(UniversalBypass, '_logError')
+
+      const mockElement = {
+        matches: jest.fn(() => {
+          throw new Error('DOM error')
+        }),
+        nodeType: 1
+      }
+
+      UniversalBypass.cleanDOM([mockElement])
+
+      expect(errorSpy).toHaveBeenCalledWith('cleanDOM selector matching', expect.any(Error))
+    })
+  })
+
+  describe('CSS Functionality Restoration', () => {
+    test('should inject CSS styles to restore functionality', async() => {
+      const mockStyle = {
+        id: '',
+        textContent: '',
+        setAttribute: jest.fn()
+      }
+
+      document.createElement = jest.fn(() => mockStyle)
+      document.getElementById = jest.fn(() => null)
+
+      await UniversalBypass.restorePageFunctionality()
+
+      expect(document.createElement).toHaveBeenCalledWith('style')
+      expect(mockStyle.setAttribute).toHaveBeenCalledWith('data-uwb-injected', 'true')
+      expect(document.head.appendChild).toHaveBeenCalledWith(mockStyle)
+    })
+
+    test('should not inject styles if already present', async() => {
+      document.getElementById = jest.fn(() => ({ id: 'universal-bypass-styles' }))
+      document.createElement = jest.fn()
+
+      await UniversalBypass.restorePageFunctionality()
+
+      expect(document.createElement).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Mutation Observer', () => {
+    test('should set up mutation observer', () => {
+      const mockObserver = {
+        observe: jest.fn(),
+        disconnect: jest.fn()
+      }
+
+      global.MutationObserver = jest.fn(() => mockObserver)
+
+      UniversalBypass.observeDOMChanges()
+
+      expect(global.MutationObserver).toHaveBeenCalled()
+      expect(mockObserver.observe).toHaveBeenCalledWith(
+        document.documentElement,
+        expect.objectContaining({
+          childList: true,
+          subtree: true
+        })
+      )
+    })
+
+    test('should handle missing MutationObserver gracefully', () => {
+      const originalMutationObserver = global.MutationObserver
+      global.MutationObserver = undefined
+
+      const logSpy = jest.spyOn(UniversalBypass, '_log')
+      UniversalBypass.observeDOMChanges()
+
+      expect(logSpy).toHaveBeenCalledWith('MutationObserver not available')
+
+      global.MutationObserver = originalMutationObserver
+    })
+  })
+
+  describe('Cleanup and Destruction', () => {
+    test('should clean up resources on destroy', () => {
+      const mockObserver = {
+        observe: jest.fn(),
+        disconnect: jest.fn()
+      }
+
+      UniversalBypass.observer = mockObserver
+      UniversalBypass.cleanupTimeout = setTimeout(() => {}, 1000)
+      UniversalBypass.initialized = true
+
+      UniversalBypass.destroy()
+
+      expect(mockObserver.disconnect).toHaveBeenCalled()
+      expect(UniversalBypass.observer).toBeNull()
+      expect(UniversalBypass.initialized).toBe(false)
+    })
+  })
+
+  describe('Error Handling', () => {
+    test('should log errors appropriately in debug mode', () => {
+      UniversalBypass.DEBUG = true
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+
+      UniversalBypass._logError('test', new Error('Test error'))
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '🛡️ UWB Error in test:',
+        expect.any(Error)
+      )
+
+      consoleSpy.mockRestore()
+    })
+
+    test('should not log errors when not in debug mode', () => {
+      UniversalBypass.DEBUG = false
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
+
+      UniversalBypass._logError('test', new Error('Test error'))
+
+      expect(consoleSpy).not.toHaveBeenCalled()
+
+      consoleSpy.mockRestore()
+    })
+  })
+})

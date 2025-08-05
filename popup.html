@@ -1,38 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Web Bypass Injector</title>
   <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      width: 320px;
+      width: 340px;
+      min-height: 400px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      background: #f8f9fa;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #2d3748;
+    }
+    
+    .container {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     }
     
     .header {
       text-align: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
     }
     
     .header h1 {
-      font-size: 18px;
+      font-size: 20px;
       margin: 0 0 4px 0;
       color: #2d3748;
+      font-weight: 600;
     }
     
     .header p {
-      font-size: 12px;
+      font-size: 13px;
       margin: 0;
       color: #718096;
     }
     
     .status {
-      background: #ffffff;
+      background: #f7fafc;
       border-radius: 8px;
       padding: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
       border: 1px solid #e2e8f0;
     }
     
@@ -41,26 +60,34 @@
       align-items: center;
       gap: 8px;
       font-size: 14px;
+      font-weight: 500;
     }
     
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: #48bb78;
+      transition: background-color 0.3s ease;
+    }
+
+    .status-dot.inactive {
+      background: #e53e3e;
     }
     
     .features {
       background: #ffffff;
       border-radius: 8px;
       padding: 12px;
+      margin-bottom: 16px;
       border: 1px solid #e2e8f0;
     }
     
     .features h3 {
-      font-size: 14px;
-      margin: 0 0 8px 0;
+      font-size: 15px;
+      margin: 0 0 10px 0;
       color: #2d3748;
+      font-weight: 600;
     }
     
     .feature-list {
@@ -70,11 +97,12 @@
     }
     
     .feature-list li {
-      font-size: 12px;
+      font-size: 13px;
       color: #4a5568;
-      margin-bottom: 4px;
-      padding-left: 16px;
+      margin-bottom: 6px;
+      padding-left: 18px;
       position: relative;
+      line-height: 1.4;
     }
     
     .feature-list li::before {
@@ -83,67 +111,198 @@
       left: 0;
       color: #48bb78;
       font-weight: bold;
+      font-size: 12px;
     }
     
     .current-site {
       background: #edf2f7;
       border-radius: 6px;
-      padding: 8px;
-      margin-top: 8px;
-      font-size: 11px;
+      padding: 10px;
+      margin-top: 12px;
+      font-size: 12px;
       color: #4a5568;
       word-break: break-all;
+      border: 1px solid #e2e8f0;
+    }
+
+    .current-site strong {
+      color: #2d3748;
+    }
+
+    .stats-container {
+      background: #f0fff4;
+      border: 1px solid #9ae6b4;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      display: none;
+    }
+
+    .stats-item {
+      color: #22543d;
+      font-weight: 500;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: #4299e1;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3182ce;
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #4a5568;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     
     .footer {
       text-align: center;
-      margin-top: 12px;
       font-size: 11px;
       color: #a0aec0;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
     }
     
     .help-link {
       color: #4f46e5;
       text-decoration: none;
       cursor: pointer;
+      font-weight: 500;
     }
     
     .help-link:hover {
       text-decoration: underline;
+      color: #3730a3;
+    }
+
+    .error-message {
+      background: #fed7d7;
+      border: 1px solid #feb2b2;
+      border-radius: 6px;
+      color: #c53030;
+      padding: 8px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      display: none;
+    }
+
+    .keyboard-shortcuts {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10px;
+      color: #a0aec0;
+    }
+
+    .keyboard-shortcuts kbd {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-family: monospace;
+      font-size: 10px;
+    }
+
+    /* Animation for status changes */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .status-dot.active {
+      animation: pulse 2s infinite;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 360px) {
+      body {
+        width: 300px;
+        padding: 12px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Universal Web Bypass</h1>
-    <p>Ad & Paywall Bypass Extension</p>
-  </div>
-  
-  <div class="status">
-    <div class="status-indicator">
-      <div class="status-dot"></div>
-      <span>Active and protecting this page</span>
-    </div>
-  </div>
-  
-  <div class="features">
-    <h3>Active Features:</h3>
-    <ul class="feature-list">
-      <li>Blocks tracking scripts</li>
-      <li>Removes paywall overlays</li>
-      <li>Disables ad networks</li>
-      <li>Restores page scrolling</li>
-      <li>Removes cookie banners</li>
-    </ul>
+  <div class="container">
+    <div id="error-container" class="error-message" style="display: none;"></div>
     
-    <div class="current-site">
-      <strong>Current site:</strong> <span id="current-url">Loading...</span>
+    <div class="header">
+      <h1>Universal Web Bypass</h1>
+      <p>Ad & Paywall Bypass Extension</p>
     </div>
-  </div>
-  
-  <div class="footer">
-    v1.0.0 | Universal Web Bypass Injector<br>
-    <a href="#" class="help-link" id="help-link">Help & FAQ</a>
+    
+    <div class="status">
+      <div class="status-indicator">
+        <div class="status-dot active"></div>
+        <span>Active and protecting this page</span>
+      </div>
+      <div id="stats-container" class="stats-container"></div>
+    </div>
+
+    <div class="controls">
+      <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information">
+        Refresh
+      </button>
+      <button id="toggle-button" class="btn btn-primary" title="Toggle bypass for this page">
+        Re-apply
+      </button>
+    </div>
+    
+    <div class="features">
+      <h3>Active Features:</h3>
+      <ul class="feature-list">
+        <li>Blocks tracking scripts & analytics</li>
+        <li>Removes paywall overlays & restrictions</li>
+        <li>Disables advertising networks</li>
+        <li>Restores page scrolling & functionality</li>
+        <li>Removes cookie & GDPR banners</li>
+        <li>Monitors for dynamic content changes</li>
+      </ul>
+      
+      <div class="current-site">
+        <strong>Current site:</strong> <span id="current-url">Loading...</span>
+      </div>
+    </div>
+    
+    <div class="footer">
+      v2.0.0 | Universal Web Bypass Injector<br>
+      <a href="#" class="help-link" id="help-link">Help & Documentation</a>
+      
+      <div class="keyboard-shortcuts">
+        Shortcuts: <kbd>Ctrl+R</kbd> Refresh | <kbd>Ctrl+H</kbd> Help | <kbd>Esc</kbd> Close
+      </div>
+    </div>
   </div>
   
   <script src="popup.js"></script>
