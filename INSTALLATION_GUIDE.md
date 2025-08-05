@@ -18,16 +18,24 @@ Before installing the Universal Web Bypass Injector extension, ensure you have:
 - **Developer mode** access in your browser
 - **Basic computer skills** for file management
 
-## Method 1: Load Unpacked Extension (Recommended for Testing)
+## Method 1: Load Unpacked Extension (Recommended for Local Testing)
 
-This method is perfect for testing the extension or if you've downloaded the source code.
+This method is perfect for testing the extension locally or if you've downloaded the source code.
 
-### Step 1: Download the Extension
+### Step 1: Download and Build the Extension
 1. **Clone the repository** or **download as ZIP**:
    ```bash
    git clone https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector.git
+   cd Universal-Web-Bypass-Injector
    ```
    Or download the ZIP file from the GitHub repository and extract it to a folder.
+
+2. **Install dependencies and build** (required for local development):
+   ```bash
+   npm install
+   npm run build
+   ```
+   This creates the `dist/` folder with the built extension files.
 
 ### Step 2: Access Chrome Extensions Page
 1. **Open Google Chrome**
@@ -47,8 +55,8 @@ This method is perfect for testing the extension or if you've downloaded the sou
 
 ### Step 4: Load the Extension
 1. **Click "Load unpacked"** button
-2. **Navigate to the Universal-Web-Bypass-Injector folder**
-3. **Select the folder** containing the extension files (manifest.json should be visible)
+2. **Navigate to the Universal-Web-Bypass-Injector/dist folder** (the built extension)
+3. **Select the dist folder** containing the built extension files (manifest.json should be visible inside)
 4. **Click "Select Folder"**
 
 ![Load Unpacked Dialog](https://via.placeholder.com/600x400/fbbc04/ffffff?text=Load+Unpacked+Dialog)
@@ -56,7 +64,7 @@ This method is perfect for testing the extension or if you've downloaded the sou
 ### Step 5: Verify Installation
 The extension should now appear in your extensions list with:
 - ✅ **Extension name**: "Universal Web Bypass Injector"
-- ✅ **Version**: 2.0.0
+- ✅ **Version**: 1.0.0
 - ✅ **Status**: Enabled
 - ✅ **Icon**: Visible in the Chrome toolbar
 
@@ -81,8 +89,11 @@ npm test
 # Run linting
 npm run lint
 
+# Build the extension
+npm run build
+
 # Run complete validation
-./validate-extension.sh
+npm run validate
 ```
 
 ### Step 2: Load in Chrome
@@ -91,8 +102,18 @@ Follow Steps 2-5 from Method 1 to load the extension.
 ### Step 3: Development Workflow
 ```bash
 # Make changes to the code
+
 # Run tests after changes
 npm test
+
+# Run linting
+npm run lint
+
+# Build extension
+npm run build
+
+# Run all validations
+npm run validate
 
 # Reload extension in Chrome
 # Go to chrome://extensions/ and click the reload button on your extension
