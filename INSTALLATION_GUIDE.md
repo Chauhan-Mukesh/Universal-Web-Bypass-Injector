@@ -64,7 +64,7 @@ This method is perfect for testing the extension locally or if you've downloaded
 ### Step 5: Verify Installation
 The extension should now appear in your extensions list with:
 - ✅ **Extension name**: "Universal Web Bypass Injector"
-- ✅ **Version**: 1.0.0
+- ✅ **Version**: 2.0.0
 - ✅ **Status**: Enabled
 - ✅ **Icon**: Visible in the Chrome toolbar
 
