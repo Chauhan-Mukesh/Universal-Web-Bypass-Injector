@@ -23,7 +23,9 @@ const BackgroundService = {
     lastActivity: null,
     sessionStartTime: Date.now(),
     blockedRequests: [],
-    siteStatistics: {}
+    siteStatistics: {},
+    blockedElements: [], // New: Log of blocked elements per site
+    elementsBlocked: 0  // New: Total count of blocked elements
   },
 
   /**
@@ -276,6 +278,9 @@ const BackgroundService = {
           this.executeBypassOnTab(sender.tab?.id || request.tabId)
           sendResponse({ success: true })
           break
+        case 'logBlockedElement':
+          this.handleLogBlockedElement(request, sender, sendResponse)
+          break
         default:
           console.log(`[UWB Background] Unknown message action: ${request.action}`)
           sendResponse({ error: 'Unknown action' })
@@ -433,6 +438,66 @@ const BackgroundService = {
       sendResponse({ success: true, stats: this.getStats() })
     } catch (error) {
       console.error('[UWB Background] Error handling bypass status:', error)
+      sendResponse({ error: error.message })
+    }
+  },
+
+  /**
+   * Handles blocked element logging from content scripts.
+   * @param {Object} request - Request object containing blocked element data.
+   * @param {Object} sender - Message sender.
+   * @param {Function} sendResponse - Response callback.
+   * @private
+   */
+  handleLogBlockedElement(request, sender, sendResponse) {
+    try {
+      const logEntry = request.data
+      if (!logEntry) {
+        sendResponse({ error: 'No log data provided' })
+        return
+      }
+
+      // Add additional metadata
+      logEntry.tabId = sender.tab?.id
+      logEntry.hostname = logEntry.url ? new URL(logEntry.url).hostname : 'unknown'
+
+      // Store in blocked elements log
+      this.stats.blockedElements.push(logEntry)
+      this.stats.elementsBlocked++
+
+      // Keep only last 500 blocked elements to prevent memory issues
+      if (this.stats.blockedElements.length > 500) {
+        this.stats.blockedElements = this.stats.blockedElements.slice(-250)
+      }
+
+      // Update site statistics for blocked elements
+      const hostname = logEntry.hostname
+      if (!this.stats.siteStatistics[hostname]) {
+        this.stats.siteStatistics[hostname] = {
+          blocked: 0,
+          lastActivity: null,
+          firstActivity: Date.now(),
+          elementsBlocked: 0
+        }
+      }
+      
+      this.stats.siteStatistics[hostname].elementsBlocked = 
+        (this.stats.siteStatistics[hostname].elementsBlocked || 0) + 1
+      this.stats.siteStatistics[hostname].lastActivity = Date.now()
+
+      // Update tab info
+      if (sender.tab?.id) {
+        const existingInfo = this.activeTabs.get(sender.tab.id) || {}
+        this.updateTabInfo(sender.tab.id, {
+          elementsBlocked: (existingInfo.elementsBlocked || 0) + 1,
+          lastElementBlocked: Date.now()
+        })
+      }
+
+      console.log(`[UWB Background] Logged blocked element: ${logEntry.type} on ${hostname}`)
+      sendResponse({ success: true })
+    } catch (error) {
+      console.error('[UWB Background] Error logging blocked element:', error)
       sendResponse({ error: error.message })
     }
   },
@@ -662,7 +727,9 @@ const BackgroundService = {
       lastActivity: null,
       sessionStartTime: Date.now(),
       blockedRequests: [],
-      siteStatistics: {}
+      siteStatistics: {},
+      blockedElements: [], // Reset blocked elements log
+      elementsBlocked: 0  // Reset elements blocked count
     }
     await this.saveStorageData()
     console.log('[UWB Background] Statistics reset')

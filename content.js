@@ -277,6 +277,37 @@
         /The resource .* was preloaded/,
         /Local Storage is supported/,
         /overrideMethod @/
+      ],
+
+      // Restricted content patterns for graceful detection
+      RESTRICTED_CONTENT_SELECTORS: [
+        '.login-required',
+        '.subscription-required',
+        '.premium-content',
+        '.member-only',
+        '.signin-wall',
+        '.registration-required',
+        '[data-requires-login]',
+        '[data-premium-content]',
+        '.content-locked',
+        '.access-denied',
+        '.subscriber-only'
+      ],
+
+      // Anti-adblock dialog patterns
+      ADBLOCK_DIALOG_SELECTORS: [
+        '[class*="adblock"]',
+        '[id*="adblock"]',
+        '[class*="adblocker"]',
+        '[id*="adblocker"]',
+        '.ad-blocker-detected',
+        '.adblock-detected',
+        '.disable-adblock',
+        '.please-disable-adblock',
+        '[data-adblock-detector]',
+        '.anti-adblock',
+        '.adblock-warning',
+        '.adblocker-warning'
       ]
     },
 
@@ -297,6 +328,18 @@
      * @type {number|null}
      */
     cleanupTimeout: null,
+
+    /**
+     * Element logging per site for diagnostics.
+     * @type {Array<Object>}
+     */
+    blockedElementsLog: [],
+
+    /**
+     * Restricted content detection cache.
+     * @type {boolean|null}
+     */
+    isRestrictedContent: null,
 
     /**
      * Extension initialization flag.
@@ -356,8 +399,12 @@
         this.cleanDOM()
         this.observeDOMChanges()
         
-        // Handle restricted content gracefully
-        this._handleRestrictedContent()
+        // Enhanced restricted content detection and handling
+        await this._detectRestrictedContent()
+        
+        // Enhanced anti-adblock circumvention
+        this._removeAdblockDialogs()
+        this._removeBlurOverlays()
         
         this.initialized = true
         this._log('Script is active. Page has been cleaned and is being monitored.')
@@ -932,6 +979,9 @@
         // Remove high z-index overlays (likely modals/paywalls) - skip for protected sites
         if (!isProtected) {
           this._removeHighZIndexOverlays(scope)
+          // Enhanced anti-adblock circumvention
+          this._removeAdblockDialogs()
+          this._removeBlurOverlays()
         }
 
         if (removedCount > 0) {
@@ -971,6 +1021,300 @@
         })
       } catch (error) {
         this._logError('_removeHighZIndexOverlays', error)
+      }
+    },
+
+    /**
+     * Detects and handles restricted content gracefully.
+     * @private
+     * @returns {Promise<boolean>} Whether content is restricted
+     */
+    async _detectRestrictedContent() {
+      try {
+        if (this.isRestrictedContent !== null) {
+          return this.isRestrictedContent
+        }
+
+        const restrictedElements = document.querySelectorAll(
+          this.config.RESTRICTED_CONTENT_SELECTORS.join(', ')
+        )
+
+        if (restrictedElements.length > 0) {
+          this._log(`Detected ${restrictedElements.length} restricted content indicators`)
+          this.isRestrictedContent = true
+          await this._showFallbackMessage()
+          return true
+        }
+
+        // Check for common login/subscription text patterns
+        const textPatterns = [
+          /log\s*in\s*to\s*continue/i,
+          /subscribe\s*to\s*read/i,
+          /premium\s*members\s*only/i,
+          /sign\s*up\s*to\s*view/i,
+          /registration\s*required/i
+        ]
+
+        const bodyText = document.body ? document.body.innerText : ''
+        const hasRestrictedPattern = textPatterns.some(pattern => pattern.test(bodyText))
+
+        if (hasRestrictedPattern) {
+          this._log('Detected restricted content based on text patterns')
+          this.isRestrictedContent = true
+          await this._showFallbackMessage()
+          return true
+        }
+
+        this.isRestrictedContent = false
+        return false
+      } catch (error) {
+        this._logError('_detectRestrictedContent', error)
+        return false
+      }
+    },
+
+    /**
+     * Shows fallback message for restricted content with Internet Archive option.
+     * @private
+     */
+    async _showFallbackMessage() {
+      try {
+        const existingMessage = document.getElementById('uwb-fallback-message')
+        if (existingMessage) return
+
+        const messageDiv = document.createElement('div')
+        messageDiv.id = 'uwb-fallback-message'
+        messageDiv.setAttribute('data-uwb-injected', 'true')
+        messageDiv.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 999999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px;
+            max-width: 320px;
+            line-height: 1.4;
+          ">
+            <div style="margin-bottom: 10px; font-weight: 600;">
+              🛡️ Universal Web Bypass
+            </div>
+            <div style="margin-bottom: 12px;">
+              This content appears to be restricted. Try viewing it through:
+            </div>
+            <a href="https://web.archive.org/web/*/${window.location.href}" 
+               target="_blank" 
+               style="
+                 color: #a8e6cf;
+                 text-decoration: none;
+                 font-weight: 500;
+                 display: inline-block;
+                 margin-bottom: 8px;
+               ">
+              📚 Internet Archive
+            </a>
+            <div style="
+              font-size: 11px;
+              opacity: 0.8;
+              cursor: pointer;
+              text-align: right;
+            " onclick="this.parentElement.parentElement.remove()">
+              ✕ Close
+            </div>
+          </div>
+        `
+
+        document.body.appendChild(messageDiv)
+        this._log('Fallback message displayed for restricted content')
+
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+          if (messageDiv.parentElement) {
+            messageDiv.remove()
+          }
+        }, 10000)
+      } catch (error) {
+        this._logError('_showFallbackMessage', error)
+      }
+    },
+
+    /**
+     * Detects and removes anti-adblock dialogs.
+     * @private
+     */
+    _removeAdblockDialogs() {
+      try {
+        let removedCount = 0
+        const adblockSelectors = this.config.ADBLOCK_DIALOG_SELECTORS
+
+        adblockSelectors.forEach(selector => {
+          const elements = document.querySelectorAll(selector)
+          elements.forEach(element => {
+            if (this._isLikelyAdblockDialog(element)) {
+              this._logBlockedElement('adblock-dialog', element, selector)
+              if (this._removeElement(element)) {
+                removedCount++
+              }
+            }
+          })
+        })
+
+        // Also check for common anti-adblock text patterns
+        const allElements = document.querySelectorAll('div, section, article, aside')
+        allElements.forEach(element => {
+          const text = element.innerText || ''
+          if (this._containsAdblockText(text) && this._isLikelyAdblockDialog(element)) {
+            this._logBlockedElement('adblock-dialog-text', element, 'text-based')
+            if (this._removeElement(element)) {
+              removedCount++
+            }
+          }
+        })
+
+        if (removedCount > 0) {
+          this._log(`Removed ${removedCount} anti-adblock dialogs`)
+        }
+      } catch (error) {
+        this._logError('_removeAdblockDialogs', error)
+      }
+    },
+
+    /**
+     * Checks if an element is likely an anti-adblock dialog.
+     * @param {HTMLElement} element - Element to check
+     * @returns {boolean} Whether element is likely an adblock dialog
+     * @private
+     */
+    _isLikelyAdblockDialog(element) {
+      try {
+        if (!element || !element.style) return false
+
+        const style = window.getComputedStyle(element)
+        const hasHighZIndex = parseInt(style.zIndex, 10) > 1000
+        const isFixedOrAbsolute = ['fixed', 'absolute'].includes(style.position)
+        const isLargeEnough = element.offsetHeight > 100 && element.offsetWidth > 200
+        const isVisible = style.display !== 'none' && style.visibility !== 'hidden'
+
+        return hasHighZIndex && isFixedOrAbsolute && isLargeEnough && isVisible
+      } catch (_error) {
+        return false
+      }
+    },
+
+    /**
+     * Checks if text contains anti-adblock messaging.
+     * @param {string} text - Text to check
+     * @returns {boolean} Whether text contains adblock messaging
+     * @private
+     */
+    _containsAdblockText(text) {
+      const adblockPatterns = [
+        /disable.*ad.?block/i,
+        /turn.*off.*ad.?block/i,
+        /ad.?block.*detected/i,
+        /please.*whitelist/i,
+        /add.*to.*whitelist/i,
+        /disable.*ad.?blocker/i,
+        /we.*noticed.*ad.?block/i,
+        /support.*us.*disable.*ad/i
+      ]
+
+      return adblockPatterns.some(pattern => pattern.test(text))
+    },
+
+    /**
+     * Logs blocked elements for diagnostics.
+     * @param {string} type - Type of blocked element
+     * @param {HTMLElement} element - The blocked element
+     * @param {string} selector - Selector used to find element
+     * @private
+     */
+    _logBlockedElement(type, element, selector) {
+      try {
+        const logEntry = {
+          type,
+          selector,
+          tagName: element.tagName,
+          className: element.className,
+          id: element.id,
+          url: window.location.href,
+          timestamp: Date.now()
+        }
+
+        this.blockedElementsLog.push(logEntry)
+        
+        // Keep only last 100 entries to prevent memory issues
+        if (this.blockedElementsLog.length > 100) {
+          this.blockedElementsLog = this.blockedElementsLog.slice(-50)
+        }
+
+        this._log(`Blocked element: ${type} - ${element.tagName}.${element.className}`)
+        
+        // Send to background script for storage
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage({
+            action: 'logBlockedElement',
+            data: logEntry
+          }).catch(() => {
+            // Silently fail if background script not available
+          })
+        }
+      } catch (error) {
+        this._logError('_logBlockedElement', error)
+      }
+    },
+
+    /**
+     * Enhanced blur overlay removal with more aggressive detection.
+     * @private
+     */
+    _removeBlurOverlays() {
+      try {
+        let removedCount = 0
+        
+        // Check for CSS filter blur
+        const allElements = document.querySelectorAll('*')
+        allElements.forEach(element => {
+          try {
+            const style = window.getComputedStyle(element)
+            if (style.filter && style.filter.includes('blur')) {
+              element.style.filter = 'none'
+              this._logBlockedElement('blur-overlay', element, 'css-filter')
+              removedCount++
+            }
+          } catch (_error) {
+            // Silently continue
+          }
+        })
+
+        // Remove blur class-based overlays
+        const blurSelectors = [
+          '.content-blur',
+          '.blurred-content',
+          '[class*="blur"]',
+          '[style*="blur"]'
+        ]
+
+        blurSelectors.forEach(selector => {
+          const elements = document.querySelectorAll(selector)
+          elements.forEach(element => {
+            element.style.filter = 'none'
+            element.style.webkitFilter = 'none'
+            this._logBlockedElement('blur-class', element, selector)
+            removedCount++
+          })
+        })
+
+        if (removedCount > 0) {
+          this._log(`Removed blur from ${removedCount} elements`)
+        }
+      } catch (error) {
+        this._logError('_removeBlurOverlays', error)
       }
     },
 

@@ -137,53 +137,39 @@ jobs:
 
       - name: 🏗️ Build extension
         run: |
-          echo "🔨 Building release version..."
-          npm run build
-          
-          # Create distribution directory
-          mkdir -p dist
-          
-          # Copy extension files
-          cp manifest.json dist/
-          cp *.js dist/
-          cp *.html dist/
-          cp *.png dist/
-          
-          # Copy icons if they exist
-          if [ -d "icons" ]; then
-            cp -r icons dist/
-          fi
-          
-          # Create release notes file
-          echo "# Universal Web Bypass Injector ${{ needs.validate.outputs.version }}" > dist/RELEASE_NOTES.md
-          echo "" >> dist/RELEASE_NOTES.md
-          echo "🚀 Release build created on $(date)" >> dist/RELEASE_NOTES.md
+          echo "🔨 Building production release..."
+          NODE_ENV=production npm run build
           
           echo "✅ Build completed successfully"
 
-      - name: 📦 Create release package
+      - name: 📦 Create release packages
         id: package
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
-          PACKAGE_NAME="universal-web-bypass-injector-$VERSION"
-          PACKAGE_PATH="$PACKAGE_NAME.zip"
           
-          cd dist
-          zip -r "../$PACKAGE_PATH" .
-          cd ..
+          echo "📦 Creating Chrome Store package..."
+          npm run package:chrome-store
+          
+          echo "📦 Creating development package..."
+          npm run package
           
           # Create source archive
-          git archive --format=zip --prefix="$PACKAGE_NAME-source/" HEAD > "$PACKAGE_NAME-source.zip"
+          git archive --format=zip --prefix="universal-web-bypass-injector-$VERSION-source/" HEAD > "packages/universal-web-bypass-injector-$VERSION-source.zip"
+          
+          echo "📦 All packages created:"
+          ls -la packages/
+          
+          # Set outputs for the main package
+          CHROME_STORE_PACKAGE=$(ls packages/*production*.zip | head -1)
+          PACKAGE_NAME=$(basename "$CHROME_STORE_PACKAGE" .zip)
           
           echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
-          echo "package_path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
-          
-          echo "📦 Packages created:"
-          ls -la *.zip
+          echo "package_path=$CHROME_STORE_PACKAGE" >> $GITHUB_OUTPUT
 
       - name: 🔐 Generate checksums
         run: |
           echo "🔐 Generating checksums..."
+          cd packages
           sha256sum *.zip > checksums.txt
           cat checksums.txt
 
@@ -192,8 +178,7 @@ jobs:
         with:
           name: release-packages-${{ needs.validate.outputs.version }}
           path: |
-            *.zip
-            checksums.txt
+            packages/
             dist/
           retention-days: 90
 
