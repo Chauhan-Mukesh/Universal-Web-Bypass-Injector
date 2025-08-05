@@ -58,7 +58,8 @@
       "!tests/**",
       "!node_modules/**",
       "!eslint.config.js",
-      "!scripts/**"
+      "!scripts/**",
+      "!coverage/**"
     ],
     "coverageProvider": "v8",
     "transformIgnorePatterns": [
