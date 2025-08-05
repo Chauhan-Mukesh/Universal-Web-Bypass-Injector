@@ -137,12 +137,48 @@ jobs:
           fetch-depth: 0
 
       - name: 🕵️ Run TruffleHog secret scan
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: main
-          head: HEAD
-          extra_args: --debug --only-verified
+        run: |
+          echo "🕵️ Starting TruffleHog secret scan..."
+          
+          # Install TruffleHog
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          
+          # Determine scan approach based on context
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "📋 PR detected - scanning diff against base branch"
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+            HEAD_REF="${{ github.event.pull_request.head.sha }}"
+            
+            if [ "$BASE_REF" != "$HEAD_REF" ]; then
+              echo "🔍 Scanning from $BASE_REF to $HEAD_REF"
+              trufflehog git file://. --since-commit="$BASE_REF" --only-verified --fail || {
+                echo "⚠️ TruffleHog found potential secrets in PR changes"
+                echo "Please review the findings above"
+                exit 1
+              }
+            else
+              echo "⚠️ Base and head commits are identical, scanning full repository"
+              trufflehog filesystem . --only-verified --fail || {
+                echo "⚠️ TruffleHog found potential secrets"
+                exit 1
+              }
+            fi
+          else
+            echo "📂 Push/schedule detected - scanning recent commits"
+            # For push events, scan last few commits to avoid scanning entire history
+            COMMITS_TO_SCAN=5
+            if [ "${{ github.event_name }}" == "push" ]; then
+              COMMITS_TO_SCAN="${{ github.event.push.commits.length || 5 }}"
+            fi
+            
+            echo "🔍 Scanning last $COMMITS_TO_SCAN commits"
+            trufflehog git file://. --max-depth="$COMMITS_TO_SCAN" --only-verified --fail || {
+              echo "⚠️ TruffleHog found potential secrets in recent commits"
+              exit 1
+            }
+          fi
+          
+          echo "✅ TruffleHog scan completed successfully"
 
       - name: 🔍 Custom secret patterns scan
         run: |

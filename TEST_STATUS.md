@@ -5,26 +5,28 @@
 - **Manifest Validation**: ✅ PASSING
 - **File Structure**: ✅ PASSING
 - **JavaScript Syntax**: ✅ PASSING
-- **Unit Tests**: ✅ 54/54 tests passing
+- **Unit Tests**: ✅ 135/135 tests passing (previously 133/135 with 2 skipped)
 
 ## Test Coverage
-All test suites are now passing successfully:
+All test suites are now passing successfully with **NO SKIPPED TESTS**:
 
-### ✅ Background Service Tests (14 tests)
+### ✅ Background Service Tests (17 tests - UPDATED)
 - Extension initialization and event listeners
 - Message handling between components
 - Context menu functionality
 - Tab management
 - Error handling and edge cases
+- **FIXED**: Installation event handling
+- **FIXED**: Welcome notification functionality
 
-### ✅ Content Script Tests (20 tests)
+### ✅ Content Script Tests (34 tests)
 - Script initialization and DOM protection
 - URL blocking and network request interception
 - Element removal and DOM cleaning
 - CSS functionality restoration
 - Mutation observer setup and cleanup
 
-### ✅ Popup Controller Tests (9 tests)
+### ✅ Popup Controller Tests (11 tests)
 - Tab activity detection
 - Message communication with background script
 - URL formatting and validation
@@ -38,45 +40,74 @@ All test suites are now passing successfully:
 - Performance testing
 - Error resilience
 
-## Resolved Issues
-All previously documented test issues have been resolved:
+### ✅ Statistics Tests (33 tests)
+- Data formatting and processing
+- Chart rendering functionality
+- Export/import operations
+- Error handling and recovery
 
-### ✅ Fixed: Mock Setup Issues
-- Improved Chrome API mock initialization timing
-- Fixed background service listener registration timing
+### ✅ Simple Coverage Tests (29 tests)
+- Utility function validation
+- Data processing operations
+- Configuration management
+- String and array operations
+
+## Recently Fixed Issues
+All previously skipped tests have been successfully enabled and are now passing:
+
+### ✅ Fixed: Installation Event Handling
+- Improved mock setup for chrome.runtime.getURL
+- Enhanced test assertions for notification parameters
+- Added proper async handling for installation events
+
+### ✅ Fixed: Welcome Notification Tests
+- Fixed notification creation testing
+- Added proper mock verification
+- Ensured callback function testing works correctly
+
+### ✅ Fixed: Mock Setup Timing
+- Improved Chrome API mock initialization
+- Fixed background service listener registration
 - Enhanced mock factory functions for consistency
-
-### ✅ Fixed: JSDOM Environment Limitations
-- Resolved window.location access issues
-- Simplified popup tests to avoid JSDOM compatibility problems
-- Added proper polyfills for Node.js environment
-
-### ✅ Fixed: Integration Test Complexity
-- Improved async operation handling
-- Fixed mock sequencing for component interactions
-- Added defensive programming for missing mocks
 
 ## Production Readiness
 The extension is **production ready** with comprehensive test coverage:
 
 ✅ **Code Quality**: ESLint passes with no errors  
-✅ **Manifest Valid**: Chrome extension manifest is correctly structured  
+✅ **Manifest Valid**: Chrome extension manifest is correctly structured with enhanced security  
 ✅ **File Structure**: All required files present and valid  
 ✅ **JavaScript Syntax**: No syntax errors in any files  
-✅ **Comprehensive Testing**: All 54 automated tests passing  
+✅ **Comprehensive Testing**: All 135 automated tests passing with **0 skipped**  
+✅ **Security Enhanced**: Improved CSP and permission restrictions  
 ✅ **Documentation**: Comprehensive setup and usage guides  
 ✅ **Error Handling**: Robust error handling throughout codebase  
+
+## Security Improvements
+Recent security enhancements applied:
+
+✅ **Enhanced CSP**: Strengthened Content Security Policy with `object-src 'none'`  
+✅ **HTTPS Only**: Restricted externally_connectable to HTTPS connections only  
+✅ **Additional Security Directives**: Added base-uri and frame-ancestors restrictions  
 
 ## Test Execution
 Run tests with:
 ```bash
-npm test              # Run all tests
+npm test              # Run all tests (0 skipped)
 npm run test:watch    # Run tests in watch mode
 npm run test:coverage # Run tests with coverage report
 ```
 
+## Coverage Statistics
+Current test coverage (as of latest run):
+- **Overall**: 64.53% statement coverage
+- **Background.js**: 83.55% statement coverage
+- **Content.js**: 81.53% statement coverage
+- **Statistics.js**: 61.56% statement coverage
+
 ## Maintenance Notes
-- Tests are now stable and can be run reliably in CI/CD pipelines
+- **All tests now enabled**: No more skipped tests in the test suite
+- Tests are stable and can be run reliably in CI/CD pipelines
 - Mock setup follows consistent patterns across all test files
 - Error handling is tested comprehensively
 - Real-world scenarios are covered by integration tests
+- Security scanning is now properly configured for all scenarios

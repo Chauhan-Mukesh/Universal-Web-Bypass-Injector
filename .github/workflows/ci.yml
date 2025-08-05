@@ -64,12 +64,18 @@ jobs:
             echo "✅ Running CI for draft PR (basic checks)"
           fi
           
-          # Check for skip markers in commit message
-          COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title }}"
+          # Check for skip markers in commit message (be more flexible with the check)
+          COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title || '' }}"
           echo "Commit message: $COMMIT_MSG"
-          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
+          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]] || [[ "$COMMIT_MSG" == *"[skip-ci]"* ]]; then
             echo "⏭️ CI skip requested in commit message"
             SHOULD_RUN="false"
+          fi
+          
+          # Ensure we have valid values
+          if [[ "$SHOULD_RUN" != "true" && "$SHOULD_RUN" != "false" ]]; then
+            echo "⚠️ Invalid SHOULD_RUN value, defaulting to true"
+            SHOULD_RUN="true"
           fi
           
           echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
@@ -247,8 +253,8 @@ jobs:
   quality-gate:
     name: ✅ Quality Gate
     runs-on: ubuntu-latest
-    needs: [test, build, security]
-    if: always()
+    needs: [preflight, test, build, security]
+    if: always() && needs.preflight.result == 'success'
     timeout-minutes: 5
     
     steps:
@@ -322,8 +328,8 @@ jobs:
   report:
     name: 📊 Generate Report
     runs-on: ubuntu-latest
-    needs: [test, build, security, quality-gate]
-    if: always() && github.event_name == 'pull_request'
+    needs: [preflight, test, build, security, quality-gate]
+    if: always() && github.event_name == 'pull_request' && needs.preflight.result == 'success'
     permissions:
       pull-requests: write
     
