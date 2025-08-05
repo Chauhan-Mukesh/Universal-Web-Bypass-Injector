@@ -9,14 +9,18 @@ module.exports = [
   {
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'module',
+      sourceType: 'script',
       globals: {
         ...globals.browser,
         ...globals.webextensions,
         ...globals.jest,
         ...globals.node,
         chrome: 'readonly',
-        UniversalBypass: 'readonly'
+        UniversalBypass: 'readonly',
+        // Add structuredClone for older Node.js versions
+        structuredClone: 'readonly',
+        // Add test globals
+        Chart: 'readonly'
       }
     },
     rules: {
