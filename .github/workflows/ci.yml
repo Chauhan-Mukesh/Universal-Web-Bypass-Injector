@@ -172,28 +172,19 @@ jobs:
         run: |
           echo "🔨 Building extension..."
           
-          # Try full build first (includes tests and coverage)
-          if npm run build; then
-            echo "✅ Full build with tests completed successfully"
-          else
-            echo "⚠️ Full build failed, attempting build without coverage..."
-            
-            # Fallback: build without requiring coverage tests
-            if npm run lint && npm run build:extension; then
-              echo "✅ Basic build completed successfully"
-            else
-              echo "❌ Build failed even without coverage requirements"
-              exit 1
-            fi
-          fi
+          # Run the build process
+          npm run build
           
           # Verify build output exists
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
             echo "❌ Build directory is missing or empty"
+            ls -la dist/ || echo "dist directory doesn't exist"
             exit 1
           fi
           
           echo "✅ Build verification completed"
+          echo "📦 Build contents:"
+          ls -la dist/
 
       - name: 📦 Create extension package
         run: |
