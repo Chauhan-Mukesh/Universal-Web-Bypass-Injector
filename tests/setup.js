@@ -93,6 +93,10 @@ global.console = {
   error: jest.fn()
 }
 
+// Mock window.alert for JSDOM
+global.alert = jest.fn()
+global.confirm = jest.fn(() => true)
+
 // Suppress JSDOM navigation errors specifically
 const _originalVirtualConsole = global.jsdom?.virtualConsole
 if (typeof window !== 'undefined' && window.virtualConsole) {
