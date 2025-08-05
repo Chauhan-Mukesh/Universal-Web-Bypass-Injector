@@ -37,17 +37,22 @@
     "health:check": "node scripts/health-check.js"
   },
   "devDependencies": {
-    "@types/chrome": "^0.1.1",
     "@eslint/js": "^9.32.0",
+    "@types/chrome": "^0.1.1",
+    "archiver": "^7.0.1",
     "eslint": "^9.32.0",
-    "globals": "^15.15.0",
+    "globals": "^16.3.0",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5"
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
-    "testMatch": ["<rootDir>/tests/**/*.test.js"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "*.js",
       "!tests/**",
@@ -72,7 +77,11 @@
     "url": "https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector/issues"
   },
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "overrides": {
+    "glob": "^10.0.0",
+    "inflight": "npm:@isaacs/inflight@^1.0.6"
   }
 }
