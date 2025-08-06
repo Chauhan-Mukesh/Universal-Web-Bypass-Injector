@@ -343,7 +343,8 @@ describe('BackgroundService Comprehensive Coverage', () => {
 
       BackgroundService.handleContextMenuClick(info, tab);
 
-      expect(console.error).toHaveBeenCalledWith('[UWB Background] Error handling context menu click:', expect.any(Error));
+      // Should log info message about user activation requirement, not error
+      expect(console.log).toHaveBeenCalledWith('[UWB Background] Popup requires user activation, will open on next action click');
     });
   });
 
