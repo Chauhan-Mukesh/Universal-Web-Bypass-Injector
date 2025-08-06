@@ -47,7 +47,7 @@ describe('PopupController Focused Coverage Tests', () => {
           if (callback) setTimeout(() => callback(tabs), 0)
           return Promise.resolve(tabs)
         }),
-        create: jest.fn((options) => Promise.resolve({ id: 124 })),
+        create: jest.fn((_options) => Promise.resolve({ id: 124 })),
         reload: jest.fn()
       }
     }
@@ -184,7 +184,7 @@ describe('PopupController Focused Coverage Tests', () => {
   })
 
   describe('queryActiveTab Method', () => {
-    test('should query active tab successfully', async () => {
+    test('should query active tab successfully', async() => {
       const tabs = await PopupController.queryActiveTab()
       
       expect(tabs).toBeDefined()
@@ -198,31 +198,21 @@ describe('PopupController Focused Coverage Tests', () => {
       )
     })
 
-    test('should handle chrome.runtime.lastError in queryActiveTab', async () => {
+    test('should handle chrome.runtime.lastError in queryActiveTab', async() => {
       global.chrome.runtime.lastError = { message: 'Tab access denied' }
       
-      try {
-        await PopupController.queryActiveTab()
-        fail('Expected error to be thrown')
-      } catch (error) {
-        expect(error.message).toBe('Tab access denied')
-      }
+      await expect(PopupController.queryActiveTab()).rejects.toThrow('Tab access denied')
       
       // Reset lastError
       global.chrome.runtime.lastError = null
     })
 
-    test('should handle generic error in queryActiveTab', async () => {
+    test('should handle generic error in queryActiveTab', async() => {
       global.chrome.tabs.query = jest.fn(() => {
         throw new Error('Chrome tabs API unavailable')
       })
       
-      try {
-        await PopupController.queryActiveTab()
-        fail('Expected error to be thrown')
-      } catch (error) {
-        expect(error.message).toBe('Chrome tabs API unavailable')
-      }
+      await expect(PopupController.queryActiveTab()).rejects.toThrow('Chrome tabs API unavailable')
       
       // Reset tabs.query mock
       global.chrome.tabs.query = jest.fn((query, callback) => {
@@ -239,7 +229,7 @@ describe('PopupController Focused Coverage Tests', () => {
   })
 
   describe('sendMessage Method', () => {
-    test('should send message successfully', async () => {
+    test('should send message successfully', async() => {
       const message = { action: 'getStats' }
       const response = await PopupController.sendMessage(message)
       
@@ -251,31 +241,21 @@ describe('PopupController Focused Coverage Tests', () => {
       )
     })
 
-    test('should handle chrome.runtime.lastError in sendMessage', async () => {
+    test('should handle chrome.runtime.lastError in sendMessage', async() => {
       global.chrome.runtime.lastError = { message: 'Extension context invalidated' }
       
-      try {
-        await PopupController.sendMessage({ action: 'test' })
-        fail('Expected error to be thrown')
-      } catch (error) {
-        expect(error.message).toBe('Extension context invalidated')
-      }
+      await expect(PopupController.sendMessage({ action: 'test' })).rejects.toThrow('Extension context invalidated')
       
       // Reset lastError
       global.chrome.runtime.lastError = null
     })
 
-    test('should handle generic error in sendMessage', async () => {
+    test('should handle generic error in sendMessage', async() => {
       global.chrome.runtime.sendMessage = jest.fn(() => {
         throw new Error('Message sending failed')
       })
       
-      try {
-        await PopupController.sendMessage({ action: 'test' })
-        fail('Expected error to be thrown')
-      } catch (error) {
-        expect(error.message).toBe('Message sending failed')
-      }
+      await expect(PopupController.sendMessage({ action: 'test' })).rejects.toThrow('Message sending failed')
       
       // Reset sendMessage mock
       global.chrome.runtime.sendMessage = jest.fn((message, callback) => {
@@ -479,7 +459,7 @@ describe('PopupController Focused Coverage Tests', () => {
       // Reset mocks
       showErrorSpy.mockRestore()
       global.window.close = originalClose
-      global.chrome.tabs.create = jest.fn((options) => Promise.resolve({ id: 124 }))
+      global.chrome.tabs.create = jest.fn((_options) => Promise.resolve({ id: 124 }))
     })
 
     test('openStatisticsPage should create new tab with statistics URL', () => {
@@ -514,7 +494,7 @@ describe('PopupController Focused Coverage Tests', () => {
       // Reset mocks
       showErrorSpy.mockRestore()
       global.window.close = originalClose
-      global.chrome.tabs.create = jest.fn((options) => Promise.resolve({ id: 124 }))
+      global.chrome.tabs.create = jest.fn((_options) => Promise.resolve({ id: 124 }))
     })
   })
 
@@ -618,7 +598,7 @@ describe('PopupController Focused Coverage Tests', () => {
   })
 
   describe('Async Loading Methods', () => {
-    test('loadCurrentTab should set currentTab and load stats', async () => {
+    test('loadCurrentTab should set currentTab and load stats', async() => {
       const mockTab = { id: 123, url: 'https://example.com', title: 'Example' }
       global.chrome.tabs.query = jest.fn((query, callback) => {
         callback([mockTab])
@@ -634,7 +614,7 @@ describe('PopupController Focused Coverage Tests', () => {
       loadTabStatsSpy.mockRestore()
     })
 
-    test('loadCurrentTab should handle no tabs found', async () => {
+    test('loadCurrentTab should handle no tabs found', async() => {
       global.chrome.tabs.query = jest.fn((query, callback) => {
         callback([])
       })
@@ -648,7 +628,7 @@ describe('PopupController Focused Coverage Tests', () => {
       showErrorSpy.mockRestore()
     })
 
-    test('loadTabStats should update stats from response', async () => {
+    test('loadTabStats should update stats from response', async() => {
       PopupController.currentTab = { id: 123 }
       const mockResponse = {
         totalBlocked: 42,
@@ -671,7 +651,7 @@ describe('PopupController Focused Coverage Tests', () => {
       }, expect.any(Function))
     })
 
-    test('loadTabStats should handle missing currentTab', async () => {
+    test('loadTabStats should handle missing currentTab', async() => {
       PopupController.currentTab = null
       
       await PopupController.loadTabStats()
@@ -680,7 +660,7 @@ describe('PopupController Focused Coverage Tests', () => {
       expect(true).toBe(true)
     })
 
-    test('loadSiteStatus should set hostname and enabled status', async () => {
+    test('loadSiteStatus should set hostname and enabled status', async() => {
       PopupController.currentTab = { url: 'https://example.com/path' }
       const mockResponse = { enabled: false }
       
@@ -698,7 +678,7 @@ describe('PopupController Focused Coverage Tests', () => {
       }, expect.any(Function))
     })
 
-    test('loadSiteStatus should handle missing currentTab', async () => {
+    test('loadSiteStatus should handle missing currentTab', async() => {
       PopupController.currentTab = null
       
       await PopupController.loadSiteStatus()
@@ -707,7 +687,7 @@ describe('PopupController Focused Coverage Tests', () => {
       expect(true).toBe(true)
     })
 
-    test('loadStatistics should merge stats with response', async () => {
+    test('loadStatistics should merge stats with response', async() => {
       const mockResponse = {
         totalBlocked: 100,
         sitesDisabled: ['blocked-site.com']
