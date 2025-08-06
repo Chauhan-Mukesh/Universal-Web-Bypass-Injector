@@ -51,7 +51,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js", "statistics.html", "statistics.js"],
+      "resources": ["content.js", "statistics.html", "statistics.js", "settings.html", "settings.js"],
       "matches": ["http://*/*", "https://*/*"],
       "use_dynamic_url": false
     }

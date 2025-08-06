@@ -93,7 +93,8 @@ const PopupController = {
       statsSummary: document.getElementById('stats-summary'),
       blockedCount: document.getElementById('blocked-count'),
       sessionTime: document.getElementById('session-time'),
-      themeToggle: document.getElementById('theme-toggle')
+      themeToggle: document.getElementById('theme-toggle'),
+      settingsLink: document.getElementById('settings-link')
     }
   },
 
@@ -108,6 +109,14 @@ const PopupController = {
         this.elements.helpLink.addEventListener('click', (e) => {
           e.preventDefault()
           this.openHelpPage()
+        })
+      }
+
+      // Settings link
+      if (this.elements.settingsLink) {
+        this.elements.settingsLink.addEventListener('click', (e) => {
+          e.preventDefault()
+          this.openSettingsPage()
         })
       }
 
@@ -527,6 +536,22 @@ const PopupController = {
     } catch (error) {
       console.error('[UWB Popup] Error opening help page:', error)
       this.showError('Could not open help page')
+    }
+  },
+
+  /**
+   * Opens the settings page in a new tab.
+   * @private
+   */
+  openSettingsPage() {
+    try {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('settings.html')
+      })
+      window.close() // Close popup after opening settings
+    } catch (error) {
+      console.error('[UWB Popup] Error opening settings page:', error)
+      this.showError('Could not open settings page')
     }
   },
 

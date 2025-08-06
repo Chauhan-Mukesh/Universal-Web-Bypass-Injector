@@ -1,6 +1,7 @@
 /**
  * Test suite for Dark Mode functionality
  */
+/* global PopupController */
 
 describe('Dark Mode', () => {
   let mockChrome
@@ -27,7 +28,7 @@ describe('Dark Mode', () => {
     mockChrome = {
       storage: {
         sync: {
-          get: jest.fn().mockImplementation((keys) => {
+          get: jest.fn().mockImplementation((_keys) => {
             return Promise.resolve({})
           }),
           set: jest.fn().mockImplementation(() => Promise.resolve())
@@ -45,7 +46,7 @@ describe('Dark Mode', () => {
   })
 
   describe('Theme Toggle', () => {
-    test('should toggle from light to dark mode', async () => {
+    test('should toggle from light to dark mode', async() => {
       // Load popup script
       require('../popup.js')
       
@@ -63,7 +64,7 @@ describe('Dark Mode', () => {
       expect(PopupController.theme.current).toBe('dark')
     })
 
-    test('should toggle from dark to light mode', async () => {
+    test('should toggle from dark to light mode', async() => {
       require('../popup.js')
       
       PopupController.cacheElements()
@@ -81,7 +82,7 @@ describe('Dark Mode', () => {
       expect(PopupController.theme.current).toBe('light')
     })
 
-    test('should update theme toggle button icon', async () => {
+    test('should update theme toggle button icon', async() => {
       require('../popup.js')
       
       PopupController.cacheElements()
@@ -96,7 +97,7 @@ describe('Dark Mode', () => {
       expect(themeToggle.textContent).toBe('☀️')
     })
 
-    test('should save theme preference to storage', async () => {
+    test('should save theme preference to storage', async() => {
       require('../popup.js')
       
       PopupController.cacheElements()
@@ -110,7 +111,7 @@ describe('Dark Mode', () => {
       })
     })
 
-    test('should load theme preference from storage', async () => {
+    test('should load theme preference from storage', async() => {
       // Mock storage returning dark theme
       mockChrome.storage.sync.get.mockImplementation(() => {
         return Promise.resolve({ 'uwb_theme_preference': 'dark' })
@@ -126,7 +127,7 @@ describe('Dark Mode', () => {
       expect(document.body.classList.contains('dark-mode')).toBe(true)
     })
 
-    test('should default to light theme if no preference stored', async () => {
+    test('should default to light theme if no preference stored', async() => {
       // Mock storage returning empty
       mockChrome.storage.sync.get.mockImplementation(() => {
         return Promise.resolve({})
@@ -142,7 +143,7 @@ describe('Dark Mode', () => {
       expect(document.body.classList.contains('dark-mode')).toBe(false)
     })
 
-    test('should handle storage errors gracefully', async () => {
+    test('should handle storage errors gracefully', async() => {
       // Mock storage error
       mockChrome.storage.sync.get.mockImplementation(() => {
         return Promise.reject(new Error('Storage error'))
