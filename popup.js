@@ -46,6 +46,15 @@ const PopupController = {
   elements: {},
 
   /**
+   * Theme configuration.
+   * @type {Object}
+   */
+  theme: {
+    current: 'light', // 'light' or 'dark'
+    storageKey: 'uwb_theme_preference'
+  },
+
+  /**
    * Initializes the popup controller.
    * @public
    */
@@ -53,6 +62,7 @@ const PopupController = {
     try {
       this.cacheElements()
       this.setupEventListeners()
+      await this.loadTheme()
       await this.loadCurrentTab()
       await this.loadSiteStatus()
       await this.loadStatistics()
@@ -82,7 +92,8 @@ const PopupController = {
       siteToggle: document.getElementById('site-toggle'),
       statsSummary: document.getElementById('stats-summary'),
       blockedCount: document.getElementById('blocked-count'),
-      sessionTime: document.getElementById('session-time')
+      sessionTime: document.getElementById('session-time'),
+      themeToggle: document.getElementById('theme-toggle')
     }
   },
 
@@ -141,6 +152,13 @@ const PopupController = {
             e.preventDefault()
             this.openStatisticsPage()
           }
+        })
+      }
+
+      // Theme toggle
+      if (this.elements.themeToggle) {
+        this.elements.themeToggle.addEventListener('click', () => {
+          this.toggleTheme()
         })
       }
 
@@ -764,6 +782,66 @@ const PopupController = {
       }, 5000)
     } catch (error) {
       console.error('[UWB Popup] Error showing error message:', error)
+    }
+  },
+
+  /**
+   * Loads the saved theme preference and applies it.
+   * @private
+   * @returns {Promise<void>}
+   */
+  async loadTheme() {
+    try {
+      const result = await chrome.storage.sync.get([this.theme.storageKey])
+      const savedTheme = result[this.theme.storageKey] || 'light'
+      this.theme.current = savedTheme
+      this.applyTheme(savedTheme)
+    } catch (error) {
+      console.error('[UWB Popup] Error loading theme:', error)
+      // Default to light theme
+      this.applyTheme('light')
+    }
+  },
+
+  /**
+   * Toggles between light and dark themes.
+   * @public
+   */
+  toggleTheme() {
+    const newTheme = this.theme.current === 'light' ? 'dark' : 'light'
+    this.theme.current = newTheme
+    this.applyTheme(newTheme)
+    this.saveTheme(newTheme)
+  },
+
+  /**
+   * Applies the specified theme to the popup.
+   * @param {string} theme - Theme to apply ('light' or 'dark')
+   * @private
+   */
+  applyTheme(theme) {
+    const body = document.body
+    const themeToggle = this.elements.themeToggle
+    
+    if (theme === 'dark') {
+      body.classList.add('dark-mode')
+      if (themeToggle) themeToggle.textContent = '☀️'
+    } else {
+      body.classList.remove('dark-mode')
+      if (themeToggle) themeToggle.textContent = '🌙'
+    }
+  },
+
+  /**
+   * Saves the theme preference to storage.
+   * @param {string} theme - Theme to save
+   * @private
+   */
+  async saveTheme(theme) {
+    try {
+      await chrome.storage.sync.set({ [this.theme.storageKey]: theme })
+    } catch (error) {
+      console.error('[UWB Popup] Error saving theme:', error)
     }
   },
 

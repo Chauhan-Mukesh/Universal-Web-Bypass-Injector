@@ -388,10 +388,132 @@
         padding: 12px;
       }
     }
+
+    /* Dark mode styles */
+    body.dark-mode {
+      background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .container {
+      background: #1a202c;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    body.dark-mode .header h1,
+    body.dark-mode .header p {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .header p {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .status {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .features {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .features h3 {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .feature-list li {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .current-site {
+      background: #374151;
+      border-color: #4a5568;
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .current-site strong {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .toggle-container {
+      background: #374151;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .toggle-label {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .btn-secondary {
+      background: #4a5568;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .btn-secondary:hover {
+      background: #718096;
+    }
+
+    body.dark-mode .footer {
+      color: #a0aec0;
+      border-top-color: #4a5568;
+    }
+
+    body.dark-mode .help-link {
+      color: #81e6d9;
+    }
+
+    body.dark-mode .help-link:hover {
+      color: #4fd1c7;
+    }
+
+    body.dark-mode .keyboard-shortcuts {
+      color: #718096;
+    }
+
+    body.dark-mode .keyboard-shortcuts kbd {
+      background: #374151;
+      border-color: #4a5568;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .error-message {
+      background: #742a2a;
+      border-color: #e53e3e;
+      color: #feb2b2;
+    }
+
+    /* Dark mode toggle */
+    .theme-toggle {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #4a5568;
+      transition: color 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      color: #2d3748;
+    }
+
+    body.dark-mode .theme-toggle {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .theme-toggle:hover {
+      color: #e2e8f0;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">🌙</button>
+    
     <div id="error-container" class="error-message" style="display: none;"></div>
     
     <div class="header">
