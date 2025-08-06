@@ -106,7 +106,7 @@ describe('Breaking Issues Prevention', () => {
         // Should not initialize on restricted URLs
         expect(() => {
           // Content script should return early for restricted URLs
-          const content = require('../content.js')
+          const _content = require('../content.js')
         }).not.toThrow()
       })
     })
@@ -249,13 +249,13 @@ describe('Breaking Issues Prevention', () => {
   })
 
   describe('Data Corruption Prevention', () => {
-    test('should handle corrupted storage data', async () => {
+    test('should handle corrupted storage data', async() => {
       mockChrome.storage.sync.get.mockResolvedValue({
         disabledSites: 'invalid_data', // Should be array
         statistics: null // Should be object
       })
 
-      expect(async () => {
+      expect(async() => {
         await BackgroundService.loadStorageData()
       }).not.toThrow()
 
@@ -263,12 +263,12 @@ describe('Breaking Issues Prevention', () => {
       expect(BackgroundService.disabledSites).toBeInstanceOf(Set)
     })
 
-    test('should handle extremely large disabled sites list', async () => {
+    test('should handle extremely large disabled sites list', async() => {
       mockChrome.storage.sync.get.mockResolvedValue({
         disabledSites: Array(10000).fill().map((_, i) => `site${i}.com`)
       })
 
-      expect(async () => {
+      expect(async() => {
         await BackgroundService.loadStorageData()
       }).not.toThrow()
 
