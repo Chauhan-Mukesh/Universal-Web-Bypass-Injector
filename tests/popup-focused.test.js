@@ -66,12 +66,36 @@ describe('PopupController Focused Coverage Tests', () => {
         setAttribute: jest.fn(),
         getAttribute: jest.fn(() => 'false')
       })),
-      querySelector: jest.fn((selector) => ({
-        textContent: '',
-        style: { backgroundColor: '#48bb78' },
-        className: 'status-dot',
-        setAttribute: jest.fn()
-      })),
+      querySelector: jest.fn((selector) => {
+        // Return appropriate mock based on selector
+        if (selector === '.status-dot') {
+          return {
+            textContent: '',
+            style: { backgroundColor: '#48bb78' },
+            className: 'status-dot',
+            setAttribute: jest.fn()
+          }
+        } else if (selector === '.status-indicator span') {
+          return {
+            textContent: '',
+            className: 'status-text',
+            setAttribute: jest.fn()
+          }
+        } else if (selector === '.footer') {
+          return {
+            textContent: 'Version v1.0.0',
+            className: 'footer',
+            setAttribute: jest.fn()
+          }
+        }
+        // Default return for other selectors
+        return {
+          textContent: '',
+          style: {},
+          className: '',
+          setAttribute: jest.fn()
+        }
+      }),
       querySelectorAll: jest.fn(() => []),
       createElement: jest.fn(() => ({
         id: '',
@@ -91,7 +115,10 @@ describe('PopupController Focused Coverage Tests', () => {
     // Mock Window
     mockWindow = {
       close: jest.fn(),
-      addEventListener: jest.fn()
+      addEventListener: jest.fn(),
+      location: {
+        href: 'chrome-extension://test-id/popup.html'
+      }
     }
 
     global.document = mockDocument
@@ -318,6 +345,275 @@ describe('PopupController Focused Coverage Tests', () => {
       PopupController.currentTab = { url: 'invalid-url' }
       const result = PopupController.isExtensionActive()
       expect(result).toBe(false)
+    })
+  })
+
+  describe('updateCurrentUrl Method', () => {
+    test('should update URL display with valid tab', () => {
+      PopupController.currentTab = { url: 'https://example.com/path', title: 'Example' }
+      
+      // Create a mock element
+      const mockElement = {
+        textContent: '',
+        title: '',
+        setAttribute: jest.fn()
+      }
+      PopupController.elements = { currentUrl: mockElement }
+      
+      PopupController.updateCurrentUrl()
+      
+      expect(mockElement.textContent).toBe('example.com')
+      expect(mockElement.title).toBe('https://example.com/path')
+    })
+
+    test('should show "No active tab" when no tab', () => {
+      PopupController.currentTab = null
+      
+      const mockElement = {
+        textContent: '',
+        title: '',
+        setAttribute: jest.fn()
+      }
+      PopupController.elements = { currentUrl: mockElement }
+      
+      PopupController.updateCurrentUrl()
+      
+      expect(mockElement.textContent).toBe('No active tab')
+    })
+
+    test('should show "Invalid URL" for malformed URL', () => {
+      PopupController.currentTab = { url: 'invalid-url' }
+      
+      const mockElement = {
+        textContent: '',
+        title: '',
+        setAttribute: jest.fn()
+      }
+      PopupController.elements = { currentUrl: mockElement }
+      
+      PopupController.updateCurrentUrl()
+      
+      expect(mockElement.textContent).toBe('Invalid URL')
+    })
+
+    test('should handle missing currentUrl element', () => {
+      PopupController.currentTab = { url: 'https://example.com' }
+      PopupController.elements = { currentUrl: null }
+      
+      expect(() => PopupController.updateCurrentUrl()).not.toThrow()
+    })
+  })
+
+  describe('updateVersion Method', () => {
+    test('should update version display', () => {
+      const mockElement = {
+        textContent: 'Version v1.0.0',
+        setAttribute: jest.fn()
+      }
+      PopupController.elements = { version: mockElement }
+      
+      PopupController.updateVersion()
+      
+      expect(mockElement.textContent).toBe('Version v2.0.1')
+      expect(chrome.runtime.getManifest).toHaveBeenCalled()
+    })
+
+    test('should handle missing version element', () => {
+      PopupController.elements = { version: null }
+      
+      expect(() => PopupController.updateVersion()).not.toThrow()
+    })
+
+    test('should handle getManifest error', () => {
+      global.chrome.runtime.getManifest = jest.fn(() => {
+        throw new Error('Manifest not available')
+      })
+      
+      const mockElement = {
+        textContent: 'Version v1.0.0',
+        setAttribute: jest.fn()
+      }
+      PopupController.elements = { version: mockElement }
+      
+      expect(() => PopupController.updateVersion()).not.toThrow()
+      
+      // Reset manifest mock
+      global.chrome.runtime.getManifest = jest.fn(() => ({
+        version: '2.0.1',
+        name: 'Universal Web Bypass Injector'
+      }))
+    })
+  })
+
+  describe('Navigation Methods', () => {
+    test('openHelpPage should create new tab', () => {
+      // Mock window.close to avoid JSDOM issues
+      const originalClose = global.window.close
+      global.window.close = jest.fn()
+      
+      PopupController.openHelpPage()
+      
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'https://github.com/Chauhan-Mukesh/Universal-Web-Bypass-Injector#readme'
+      })
+      expect(global.window.close).toHaveBeenCalled()
+      
+      // Restore
+      global.window.close = originalClose
+    })
+
+    test('openHelpPage should handle tab creation error', () => {
+      global.chrome.tabs.create = jest.fn(() => {
+        throw new Error('Tab creation failed')
+      })
+      
+      // Mock showError and window.close to capture error display
+      const showErrorSpy = jest.spyOn(PopupController, 'showError').mockImplementation(() => {})
+      const originalClose = global.window.close
+      global.window.close = jest.fn()
+      
+      PopupController.openHelpPage()
+      
+      expect(showErrorSpy).toHaveBeenCalledWith('Could not open help page')
+      
+      // Reset mocks
+      showErrorSpy.mockRestore()
+      global.window.close = originalClose
+      global.chrome.tabs.create = jest.fn((options) => Promise.resolve({ id: 124 }))
+    })
+
+    test('openStatisticsPage should create new tab with statistics URL', () => {
+      const originalClose = global.window.close
+      global.window.close = jest.fn()
+      
+      PopupController.openStatisticsPage()
+      
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'chrome-extension://test-id/statistics.html'
+      })
+      expect(chrome.runtime.getURL).toHaveBeenCalledWith('statistics.html')
+      expect(global.window.close).toHaveBeenCalled()
+      
+      // Restore
+      global.window.close = originalClose
+    })
+
+    test('openStatisticsPage should handle error', () => {
+      global.chrome.tabs.create = jest.fn(() => {
+        throw new Error('Tab creation failed')
+      })
+      
+      const showErrorSpy = jest.spyOn(PopupController, 'showError').mockImplementation(() => {})
+      const originalClose = global.window.close
+      global.window.close = jest.fn()
+      
+      PopupController.openStatisticsPage()
+      
+      expect(showErrorSpy).toHaveBeenCalledWith('Could not open statistics page')
+      
+      // Reset mocks
+      showErrorSpy.mockRestore()
+      global.window.close = originalClose
+      global.chrome.tabs.create = jest.fn((options) => Promise.resolve({ id: 124 }))
+    })
+  })
+
+  describe('Error and Message Display Methods', () => {
+    test('showError should create and display error message when no container exists', () => {
+      // Start with no error container
+      PopupController.elements = {}
+      
+      // Set up document.createElement to return our mock
+      const mockContainer = {
+        id: '',
+        className: '',
+        textContent: '',
+        style: { 
+          cssText: '',
+          display: 'none'
+        }
+      }
+      
+      global.document.createElement = jest.fn(() => mockContainer)
+      global.document.body.firstChild = { id: 'first-child' }
+      global.document.body.insertBefore = jest.fn()
+      global.document.body.appendChild = jest.fn()
+      
+      PopupController.showError('Test error message')
+      
+      expect(mockContainer.textContent).toBe('Test error message')
+      expect(mockContainer.style.display).toBe('block')
+      expect(mockContainer.id).toBe('error-container')
+      expect(mockContainer.className).toBe('error-message')
+      expect(global.document.createElement).toHaveBeenCalledWith('div')
+      // Don't check insertBefore specifically since the logic varies
+    })
+
+    test('showError should reuse existing error container', () => {
+      const mockContainer = {
+        textContent: '',
+        style: { display: 'none' }
+      }
+      
+      PopupController.elements = { errorContainer: mockContainer }
+      
+      PopupController.showError('Reused error message')
+      
+      expect(mockContainer.textContent).toBe('Reused error message')
+      expect(mockContainer.style.display).toBe('block')
+    })
+
+    test('showError should handle errors gracefully', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      
+      // Make elements.errorContainer throw an error
+      Object.defineProperty(PopupController, 'elements', {
+        get: () => {
+          throw new Error('Elements access failed')
+        }
+      })
+      
+      expect(() => PopupController.showError('Test error')).not.toThrow()
+      expect(consoleSpy).toHaveBeenCalledWith('[UWB Popup] Error showing error message:', expect.any(Error))
+      
+      consoleSpy.mockRestore()
+      // Reset elements
+      PopupController.elements = {}
+    })
+
+    test('showMessage should create and display success message', () => {
+      const mockContainer = {
+        id: '',
+        textContent: '',
+        style: {
+          cssText: '',
+          display: 'none'
+        }
+      }
+      
+      global.document.createElement = jest.fn(() => mockContainer)
+      global.document.getElementById = jest.fn(() => null) // No existing container
+      
+      const mockMainContainer = { insertBefore: jest.fn() }
+      global.document.querySelector = jest.fn(() => mockMainContainer)
+      
+      PopupController.showMessage('Success message', 'success')
+      
+      expect(mockContainer.textContent).toBe('Success message')
+      expect(mockContainer.style.display).toBe('block')
+      expect(mockContainer.id).toBe('message-container')
+    })
+
+    test('showMessage should handle missing container gracefully', () => {
+      global.document.querySelector = jest.fn(() => null) // No main container
+      global.document.createElement = jest.fn(() => ({
+        id: '',
+        textContent: '',
+        style: { cssText: '', display: 'none' }
+      }))
+      global.document.getElementById = jest.fn(() => null)
+      
+      expect(() => PopupController.showMessage('Test message')).not.toThrow()
     })
   })
 })
