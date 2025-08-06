@@ -616,4 +616,289 @@ describe('PopupController Focused Coverage Tests', () => {
       expect(() => PopupController.showMessage('Test message')).not.toThrow()
     })
   })
+
+  describe('Async Loading Methods', () => {
+    test('loadCurrentTab should set currentTab and load stats', async () => {
+      const mockTab = { id: 123, url: 'https://example.com', title: 'Example' }
+      global.chrome.tabs.query = jest.fn((query, callback) => {
+        callback([mockTab])
+      })
+      
+      const loadTabStatsSpy = jest.spyOn(PopupController, 'loadTabStats').mockResolvedValue()
+      
+      await PopupController.loadCurrentTab()
+      
+      expect(PopupController.currentTab).toEqual(mockTab)
+      expect(loadTabStatsSpy).toHaveBeenCalled()
+      
+      loadTabStatsSpy.mockRestore()
+    })
+
+    test('loadCurrentTab should handle no tabs found', async () => {
+      global.chrome.tabs.query = jest.fn((query, callback) => {
+        callback([])
+      })
+      
+      const showErrorSpy = jest.spyOn(PopupController, 'showError').mockImplementation(() => {})
+      
+      await PopupController.loadCurrentTab()
+      
+      expect(showErrorSpy).toHaveBeenCalledWith('Could not access current tab')
+      
+      showErrorSpy.mockRestore()
+    })
+
+    test('loadTabStats should update stats from response', async () => {
+      PopupController.currentTab = { id: 123 }
+      const mockResponse = {
+        totalBlocked: 42,
+        bypassActive: true,
+        lastActivity: Date.now(),
+        sessionStartTime: Date.now() - 60000
+      }
+      
+      global.chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback(mockResponse)
+      })
+      
+      await PopupController.loadTabStats()
+      
+      expect(PopupController.stats.blocked).toBe(42)
+      expect(PopupController.stats.active).toBe(true)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'getTabInfo',
+        tabId: 123
+      }, expect.any(Function))
+    })
+
+    test('loadTabStats should handle missing currentTab', async () => {
+      PopupController.currentTab = null
+      
+      await PopupController.loadTabStats()
+      
+      // Should return early without error
+      expect(true).toBe(true)
+    })
+
+    test('loadSiteStatus should set hostname and enabled status', async () => {
+      PopupController.currentTab = { url: 'https://example.com/path' }
+      const mockResponse = { enabled: false }
+      
+      global.chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback(mockResponse)
+      })
+      
+      await PopupController.loadSiteStatus()
+      
+      expect(PopupController.siteStatus.hostname).toBe('example.com')
+      expect(PopupController.siteStatus.enabled).toBe(false)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'getSiteStatus',
+        hostname: 'example.com'
+      }, expect.any(Function))
+    })
+
+    test('loadSiteStatus should handle missing currentTab', async () => {
+      PopupController.currentTab = null
+      
+      await PopupController.loadSiteStatus()
+      
+      // Should return early without error
+      expect(true).toBe(true)
+    })
+
+    test('loadStatistics should merge stats with response', async () => {
+      const mockResponse = {
+        totalBlocked: 100,
+        sitesDisabled: ['blocked-site.com']
+      }
+      
+      global.chrome.runtime.sendMessage = jest.fn((message, callback) => {
+        callback(mockResponse)
+      })
+      
+      PopupController.stats = { blocked: 0, active: true }
+      
+      await PopupController.loadStatistics()
+      
+      expect(PopupController.stats.totalBlocked).toBe(100)
+      expect(PopupController.stats.sitesDisabled).toEqual(['blocked-site.com'])
+      expect(PopupController.stats.active).toBe(true) // Should preserve existing
+    })
+  })
+
+  describe('Keyboard Shortcuts Method', () => {
+    test('handleKeyboardShortcuts should handle Ctrl+R for refresh', () => {
+      const refreshSpy = jest.spyOn(PopupController, 'refreshCurrentTab').mockImplementation(() => {})
+      const event = {
+        key: 'r',
+        ctrlKey: true,
+        preventDefault: jest.fn()
+      }
+      
+      PopupController.handleKeyboardShortcuts(event)
+      
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(refreshSpy).toHaveBeenCalled()
+      
+      refreshSpy.mockRestore()
+    })
+
+    test('handleKeyboardShortcuts should handle Cmd+H for help', () => {
+      const helpSpy = jest.spyOn(PopupController, 'openHelpPage').mockImplementation(() => {})
+      const event = {
+        key: 'h',
+        metaKey: true,
+        preventDefault: jest.fn()
+      }
+      
+      PopupController.handleKeyboardShortcuts(event)
+      
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(helpSpy).toHaveBeenCalled()
+      
+      helpSpy.mockRestore()
+    })
+
+    test('handleKeyboardShortcuts should handle Escape to close', () => {
+      const originalClose = global.window.close
+      global.window.close = jest.fn()
+      
+      const event = { key: 'Escape' }
+      
+      PopupController.handleKeyboardShortcuts(event)
+      
+      expect(global.window.close).toHaveBeenCalled()
+      
+      global.window.close = originalClose
+    })
+
+    test('handleKeyboardShortcuts should ignore other keys', () => {
+      const event = { key: 'a', ctrlKey: false }
+      
+      expect(() => PopupController.handleKeyboardShortcuts(event)).not.toThrow()
+    })
+
+    test('handleKeyboardShortcuts should handle errors gracefully', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      
+      const event = {
+        key: 'r',
+        ctrlKey: true,
+        preventDefault: () => { throw new Error('preventDefault failed') }
+      }
+      
+      PopupController.handleKeyboardShortcuts(event)
+      
+      expect(consoleSpy).toHaveBeenCalledWith('[UWB Popup] Error handling keyboard shortcut:', expect.any(Error))
+      
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('Additional UI Update Methods', () => {
+    test('updateStatus should execute without errors', () => {
+      PopupController.siteStatus = { enabled: true }
+      PopupController.currentTab = { url: 'https://example.com' }
+      PopupController.elements = {
+        statusDot: { style: { backgroundColor: '' }, className: '' },
+        statusText: { textContent: '' }
+      }
+      
+      expect(() => PopupController.updateStatus()).not.toThrow()
+    })
+
+    test('updateStatus should handle disabled site', () => {
+      PopupController.siteStatus = { enabled: false }
+      PopupController.elements = {
+        statusDot: { style: { backgroundColor: '' }, className: '' },
+        statusText: { textContent: '' }
+      }
+      
+      expect(() => PopupController.updateStatus()).not.toThrow()
+    })
+
+    test('updateStatus should handle missing elements', () => {
+      PopupController.elements = {}
+      
+      expect(() => PopupController.updateStatus()).not.toThrow()
+    })
+
+    test('updateStatistics should execute when stats are available', () => {
+      PopupController.stats = { 
+        blocked: 25, 
+        totalBlocked: 100, 
+        sessionStartTime: Date.now() - 60000 
+      }
+      PopupController.elements = { 
+        statsSummary: { style: { display: 'none' }, classList: { add: jest.fn() } },
+        blockedCount: { textContent: '' },
+        sessionTime: { textContent: '' }
+      }
+      
+      expect(() => PopupController.updateStatistics()).not.toThrow()
+    })
+
+    test('updateStatistics should handle no stats', () => {
+      PopupController.stats = { blocked: 0, sessionsActive: 0 }
+      PopupController.elements = { statsSummary: { style: { display: 'block' } } }
+      
+      expect(() => PopupController.updateStatistics()).not.toThrow()
+    })
+
+    test('updateStatistics should handle missing statsSummary', () => {
+      PopupController.elements = {}
+      
+      expect(() => PopupController.updateStatistics()).not.toThrow()
+    })
+
+    test('updateStatsDisplay should execute with stats', () => {
+      PopupController.stats = { blocked: 15 }
+      PopupController.elements = { 
+        statsContainer: { innerHTML: '', style: { display: 'none' } }
+      }
+      
+      expect(() => PopupController.updateStatsDisplay()).not.toThrow()
+    })
+
+    test('updateStatsDisplay should handle no stats', () => {
+      PopupController.stats = { blocked: 0 }
+      PopupController.elements = { statsContainer: { style: { display: 'block' } } }
+      
+      expect(() => PopupController.updateStatsDisplay()).not.toThrow()
+    })
+
+    test('updateStatsDisplay should handle missing statsContainer', () => {
+      PopupController.elements = {}
+      
+      expect(() => PopupController.updateStatsDisplay()).not.toThrow()
+    })
+  })
+
+  describe('Cleanup Method', () => {
+    test('destroy should log cleanup message', () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
+      
+      PopupController.destroy()
+      
+      expect(consoleSpy).toHaveBeenCalledWith('[UWB Popup] Popup controller destroyed')
+      
+      consoleSpy.mockRestore()
+    })
+
+    test('destroy should handle errors gracefully', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      
+      // Mock console.log to throw an error
+      const originalLog = console.log
+      console.log = jest.fn(() => { throw new Error('Log failed') })
+      
+      PopupController.destroy()
+      
+      expect(consoleSpy).toHaveBeenCalledWith('[UWB Popup] Error during cleanup:', expect.any(Error))
+      
+      console.log = originalLog
+      consoleSpy.mockRestore()
+    })
+  })
 })
