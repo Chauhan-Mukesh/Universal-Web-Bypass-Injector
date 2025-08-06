@@ -18,6 +18,8 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #2d3748;
+      font-size: 14px;
+      line-height: 1.5;
     }
     
     .container {
@@ -244,6 +246,24 @@
       transform: none;
     }
 
+    .btn:focus {
+      outline: 2px solid #4299e1;
+      outline-offset: 2px;
+    }
+
+    body.dark-mode .btn:focus {
+      outline-color: #81e6d9;
+    }
+
+    .toggle-switch:focus {
+      outline: 2px solid #4299e1;
+      outline-offset: 2px;
+    }
+
+    body.dark-mode .toggle-switch:focus {
+      outline-color: #81e6d9;
+    }
+
     .stats-summary {
       background: #f0fff4;
       border: 1px solid #9ae6b4;
@@ -386,87 +406,432 @@
       body {
         width: 300px;
         padding: 12px;
+        font-size: 13px;
       }
+      
+      .header h1 {
+        font-size: 18px;
+      }
+      
+      .features h2 {
+        font-size: 14px;
+      }
+      
+      .btn {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      
+      .keyboard-shortcuts {
+        font-size: 9px;
+      }
+    }
+
+    @media (max-width: 320px) {
+      body {
+        width: 280px;
+        padding: 10px;
+        font-size: 12px;
+      }
+      
+      .header {
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+      }
+      
+      .header h1 {
+        font-size: 16px;
+      }
+      
+      .header p {
+        font-size: 11px;
+      }
+      
+      .controls {
+        gap: 10px;
+      }
+      
+      .button-controls {
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      .btn {
+        padding: 8px;
+        font-size: 11px;
+      }
+      
+      .theme-toggle {
+        font-size: 14px;
+      }
+    }
+
+    /* High DPI displays */
+    @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+      .status-dot {
+        width: 8px;
+        height: 8px;
+      }
+      
+      .theme-toggle {
+        font-size: 14px;
+      }
+    }
+
+    /* Touch device optimizations */
+    @media (pointer: coarse) {
+      .btn, .toggle-switch, .theme-toggle {
+        min-height: 44px;
+        min-width: 44px;
+      }
+      
+      .toggle-switch {
+        width: 50px;
+        height: 28px;
+      }
+      
+      .toggle-switch::before {
+        width: 24px;
+        height: 24px;
+      }
+      
+      .toggle-switch.active::before {
+        transform: translateX(22px);
+      }
+      
+      .stats-summary {
+        padding: 16px;
+      }
+    }
+
+    /* Landscape orientation on small screens */
+    @media (max-height: 500px) and (orientation: landscape) {
+      body {
+        min-height: auto;
+        padding: 8px;
+      }
+      
+      .header {
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+      }
+      
+      .controls {
+        gap: 8px;
+      }
+      
+      .features {
+        margin-bottom: 12px;
+      }
+      
+      .footer {
+        padding-top: 8px;
+      }
+      
+      .keyboard-shortcuts {
+        display: none; /* Hide to save space */
+      }
+    }
+
+    /* Large screens optimization */
+    @media (min-width: 400px) {
+      body {
+        width: 380px;
+        padding: 20px;
+      }
+      
+      .container {
+        padding: 20px;
+      }
+      
+      .header h1 {
+        font-size: 22px;
+      }
+      
+      .btn {
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+    }
+
+    /* Prefer reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      
+      .status-dot.active {
+        animation: none;
+      }
+    }
+
+    /* Dark mode styles */
+    body.dark-mode {
+      background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .container {
+      background: #1a202c;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    body.dark-mode .header h1,
+    body.dark-mode .header p {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .header p {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .status {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .features {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .features h3 {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .feature-list li {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .current-site {
+      background: #374151;
+      border-color: #4a5568;
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .current-site strong {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .toggle-container {
+      background: #374151;
+      border-color: #4a5568;
+    }
+
+    body.dark-mode .toggle-label {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .btn-secondary {
+      background: #4a5568;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .btn-secondary:hover {
+      background: #718096;
+    }
+
+    body.dark-mode .footer {
+      color: #a0aec0;
+      border-top-color: #4a5568;
+    }
+
+    body.dark-mode .help-link {
+      color: #81e6d9;
+    }
+
+    body.dark-mode .help-link:hover {
+      color: #4fd1c7;
+    }
+
+    body.dark-mode .keyboard-shortcuts {
+      color: #718096;
+    }
+
+    body.dark-mode .keyboard-shortcuts kbd {
+      background: #374151;
+      border-color: #4a5568;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .error-message {
+      background: #742a2a;
+      border-color: #e53e3e;
+      color: #feb2b2;
+    }
+
+    /* Dark mode toggle */
+    .theme-toggle {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #4a5568;
+      transition: color 0.3s ease;
+    }
+
+    .theme-toggle:hover {
+      color: #2d3748;
+    }
+
+    .theme-toggle:focus {
+      outline: 2px solid #4299e1;
+      outline-offset: 2px;
+    }
+
+    body.dark-mode .theme-toggle {
+      color: #cbd5e0;
+    }
+
+    body.dark-mode .theme-toggle:hover {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .theme-toggle:focus {
+      outline-color: #81e6d9;
+    }
+
+    /* Skip link for accessibility */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 6px;
+      background: #4299e1;
+      color: white;
+      padding: 8px;
+      text-decoration: none;
+      border-radius: 4px;
+      z-index: 1000;
+      font-size: 12px;
+    }
+
+    .skip-link:focus {
+      top: 6px;
+    }
+
+    /* Improved text contrast */
+    .header p {
+      color: #4a5568; /* Better contrast ratio */
+    }
+
+    body.dark-mode .header p {
+      color: #a0aec0; /* Better contrast in dark mode */
+    }
+
+    /* Screen reader only class */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
   </style>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  
   <div class="container">
-    <div id="error-container" class="error-message" style="display: none;"></div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">🌙</button>
     
-    <div class="header">
+    <div id="error-container" class="error-message" style="display: none;" role="alert" aria-live="assertive"></div>
+    
+    <header class="header">
       <h1>Universal Web Bypass</h1>
       <p>Ad & Paywall Bypass Extension</p>
-    </div>
+    </header>
     
-    <div class="status">
-      <div class="status-indicator">
-        <div class="status-dot active" id="status-dot" aria-label="Extension status"></div>
-        <span id="status-text">Active and protecting this page</span>
-      </div>
-      <div id="stats-container" class="stats-container" aria-live="polite"></div>
-    </div>
+    <main id="main-content">
+      <section class="status" aria-labelledby="status-heading">
+        <h2 id="status-heading" class="sr-only">Extension Status</h2>
+        <div class="status-indicator">
+          <div class="status-dot active" id="status-dot" aria-label="Extension status"></div>
+          <span id="status-text">Active and protecting this page</span>
+        </div>
+        <div id="stats-container" class="stats-container" aria-live="polite"></div>
+      </section>
 
-    <div class="controls">
-      <!-- Site Toggle Control -->
-      <div class="toggle-container">
-        <div class="toggle-label">Enable for this site</div>
-        <div class="toggle-switch active" id="site-toggle" role="switch" aria-checked="true" tabindex="0">
+      <section class="controls" aria-labelledby="controls-heading">
+        <h2 id="controls-heading" class="sr-only">Extension Controls</h2>
+        
+        <!-- Site Toggle Control -->
+        <div class="toggle-container">
+          <label for="site-toggle" class="toggle-label">Enable for this site</label>
+          <div class="toggle-switch active" id="site-toggle" role="switch" aria-checked="true" tabindex="0" aria-labelledby="site-toggle-label">
+          </div>
+          <span id="site-toggle-label" class="sr-only">Toggle extension for current site</span>
         </div>
-      </div>
+        
+        <!-- Action Buttons -->
+        <div class="button-controls" role="group" aria-labelledby="button-controls-heading">
+          <h3 id="button-controls-heading" class="sr-only">Action Buttons</h3>
+          <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information" aria-label="Refresh current tab information">
+            🔄 <span>Refresh</span>
+          </button>
+          <button id="toggle-button" class="btn btn-primary" title="Re-apply bypass for this page" aria-label="Re-apply bypass rules">
+            ⚡ <span>Re-apply</span>
+          </button>
+        </div>
+      </section>
       
-      <!-- Action Buttons -->
-      <div class="button-controls">
-        <button id="refresh-button" class="btn btn-secondary" title="Refresh tab information" aria-label="Refresh current tab information">
-          🔄 Refresh
-        </button>
-        <button id="toggle-button" class="btn btn-primary" title="Re-apply bypass for this page" aria-label="Re-apply bypass rules">
-          ⚡ Re-apply
-        </button>
-      </div>
-    </div>
-    
-    <div class="features">
-      <h3>Active Features:</h3>
-      <ul class="feature-list">
-        <li>Blocks tracking scripts & analytics</li>
-        <li>Removes paywall overlays & restrictions</li>
-        <li>Disables advertising networks</li>
-        <li>Restores page scrolling & functionality</li>
-        <li>Removes cookie & GDPR banners</li>
-        <li>Monitors for dynamic content changes</li>
-      </ul>
-      
-      <div class="current-site">
-        <strong>Current site:</strong> <span id="current-url">Loading...</span>
-      </div>
+      <section class="features" aria-labelledby="features-heading">
+        <h2 id="features-heading">Active Features:</h2>
+        <ul class="feature-list">
+          <li>Blocks tracking scripts &amp; analytics</li>
+          <li>Removes paywall overlays &amp; restrictions</li>
+          <li>Disables advertising networks</li>
+          <li>Restores page scrolling &amp; functionality</li>
+          <li>Removes cookie &amp; GDPR banners</li>
+          <li>Monitors for dynamic content changes</li>
+        </ul>
+        
+        <div class="current-site">
+          <strong>Current site:</strong> <span id="current-url">Loading...</span>
+        </div>
 
-      <!-- Statistics Summary -->
-      <div class="stats-summary" id="stats-summary" style="display: none;" role="button" tabindex="0" aria-label="View detailed statistics">
-        <div class="stats-grid">
-          <div class="stat-item">
-            <span class="stat-number" id="blocked-count">0</span>
-            <span class="stat-label">Blocked</span>
+        <!-- Statistics Summary -->
+        <div class="stats-summary" id="stats-summary" style="display: none;" role="button" tabindex="0" aria-label="View detailed statistics" aria-describedby="stats-description">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-number" id="blocked-count">0</span>
+              <span class="stat-label">Blocked</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="session-time">0m</span>
+              <span class="stat-label">Session</span>
+            </div>
           </div>
-          <div class="stat-item">
-            <span class="stat-number" id="session-time">0m</span>
-            <span class="stat-label">Session</span>
+          <div class="view-details" id="stats-description">
+            📊 Click to view detailed statistics
           </div>
         </div>
-        <div class="view-details">
-          📊 Click to view detailed statistics
-        </div>
-      </div>
-    </div>
+      </section>
+    </main>
     
-    <div class="footer">
+    <footer class="footer">
       v2.0.1 | Universal Web Bypass Injector<br>
-      <a href="#" class="help-link" id="help-link">Help & Documentation</a>
+      <a href="#" class="help-link" id="help-link">Help &amp; Documentation</a> | 
+      <a href="#" class="help-link" id="settings-link">Settings</a>
       
-      <div class="keyboard-shortcuts">
-        Shortcuts: <kbd>Ctrl+R</kbd> Refresh | <kbd>Ctrl+H</kbd> Help | <kbd>Esc</kbd> Close
+      <div class="keyboard-shortcuts" aria-labelledby="shortcuts-heading">
+        <h3 id="shortcuts-heading" class="sr-only">Keyboard Shortcuts</h3>
+        Shortcuts: <kbd aria-label="Control R">Ctrl+R</kbd> Refresh | <kbd aria-label="Control H">Ctrl+H</kbd> Help | <kbd aria-label="Escape">Esc</kbd> Close
       </div>
-    </div>
+    </footer>
   </div>
   
   <script src="popup.js"></script>

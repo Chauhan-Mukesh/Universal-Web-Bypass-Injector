@@ -14,6 +14,34 @@
  */
 const BackgroundService = {
   /**
+   * Debug configuration.
+   * @type {Object}
+   */
+  debug: {
+    enabled: false, // Set to true for verbose logging
+    level: 'error' // 'log', 'warn', 'error'
+  },
+
+  /**
+   * Enhanced logging utility.
+   * @param {string} level - Log level
+   * @param {string} message - Log message
+   * @param {...any} args - Additional arguments
+   * @private
+   */
+  log(level, message, ...args) {
+    if (!this.debug.enabled && level === 'log') return
+    
+    const levels = { log: 0, warn: 1, error: 2 }
+    const currentLevel = levels[this.debug.level] || 0
+    const messageLevel = levels[level] || 0
+    
+    if (messageLevel >= currentLevel) {
+      console[level](`[UWB Background] ${message}`, ...args)
+    }
+  },
+
+  /**
    * Extension statistics.
    * @type {Object}
    */
@@ -53,7 +81,7 @@ const BackgroundService = {
       // Load storage data asynchronously
       await this.loadStorageData()
       
-      console.log('[UWB Background] Service initialized successfully')
+      this.log('log', 'Service initialized successfully')
     } catch (error) {
       console.error('[UWB Background] Error during initialization:', error)
     }
@@ -75,7 +103,7 @@ const BackgroundService = {
         this.stats = { ...this.stats, ...result.statistics }
       }
       
-      console.log('[UWB Background] Loaded storage data')
+      this.log('log', 'Loaded storage data')
     } catch (error) {
       console.error('[UWB Background] Error loading storage data:', error)
     }
@@ -128,7 +156,7 @@ const BackgroundService = {
         this.handleTabRemoval(tabId)
       })
 
-      console.log('[UWB Background] Event listeners setup complete')
+      this.log('log', 'Event listeners setup complete')
     } catch (error) {
       console.error('[UWB Background] Error setting up event listeners:', error)
     }
@@ -145,18 +173,18 @@ const BackgroundService = {
 
       switch (details.reason) {
         case 'install':
-          console.log(`[UWB Background] Extension installed successfully v${version}`)
+          this.log('log', `Extension installed successfully v${version}`)
           this.showWelcomeNotification()
           break
         case 'update':
-          console.log(`[UWB Background] Extension updated to v${version}`)
+          this.log('log', `Extension updated to v${version}`)
           this.handleUpdate(details.previousVersion, version)
           break
         case 'chrome_update':
-          console.log('[UWB Background] Chrome browser updated')
+          this.log('log', 'Chrome browser updated')
           break
         case 'shared_module_update':
-          console.log('[UWB Background] Shared module updated')
+          this.log('log', 'Shared module updated')
           break
       }
     } catch (error) {
