@@ -5,7 +5,7 @@
 
 describe('Statistics Controller Enhanced Coverage Tests', () => {
   let StatisticsController
-  let originalDocument, originalWindow
+  let originalDocument, originalWindow, originalStatisticsController = {}
 
   beforeEach(() => {
     // Save originals
@@ -73,6 +73,13 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
     require('../statistics.js')
     StatisticsController = global.window.StatisticsController
     
+    // Store original methods for restoration
+    originalStatisticsController = {
+      init: StatisticsController.init,
+      cacheElements: StatisticsController.cacheElements,
+      setupEventListeners: StatisticsController.setupEventListeners
+    }
+    
     // Set up spies on the actual document and window methods after script loads
     jest.spyOn(document, 'getElementById').mockImplementation(() => createMockElement())
     jest.spyOn(document, 'querySelector').mockImplementation(() => createMockElement())
@@ -91,6 +98,17 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
     // Restore console
     console.log.mockRestore?.()
     console.error.mockRestore?.()
+    
+    // Restore any manually mocked StatisticsController methods
+    if (originalStatisticsController.init) {
+      StatisticsController.init = originalStatisticsController.init
+    }
+    if (originalStatisticsController.cacheElements) {
+      StatisticsController.cacheElements = originalStatisticsController.cacheElements
+    }
+    if (originalStatisticsController.setupEventListeners) {
+      StatisticsController.setupEventListeners = originalStatisticsController.setupEventListeners
+    }
     
     // Restore globals
     global.document = originalDocument
@@ -125,7 +143,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
     test('setupAutoRefresh should set interval (line 533)', () => {
       // Directly call setupAutoRefresh to cover line 533
       StatisticsController.setupAutoRefresh()
-      expect(global.window.setInterval).toHaveBeenCalledWith(expect.any(Function), 30000)
+      expect(window.setInterval).toHaveBeenCalledWith(expect.any(Function), 30000)
       expect(StatisticsController.refreshInterval).toBe(12345)
     })
 
@@ -161,7 +179,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       
       StatisticsController.destroy()
       
-      expect(global.window.clearInterval).toHaveBeenCalledWith(12345)
+      expect(window.clearInterval).toHaveBeenCalledWith(12345)
       expect(StatisticsController.refreshInterval).toBeNull()
       expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Statistics controller destroyed')
     })
@@ -171,7 +189,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       
       StatisticsController.destroy()
       
-      expect(global.window.clearInterval).not.toHaveBeenCalled()
+      expect(window.clearInterval).not.toHaveBeenCalled()
       expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Statistics controller destroyed')
     })
 
@@ -186,26 +204,25 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
 
   // Test event listeners to cover lines 614-617 and 621-622
   describe('Event Listeners Coverage', () => {
-    test('should trigger DOMContentLoaded callback that handles init errors (lines 614-617)', (done) => {
+    test('should trigger DOMContentLoaded callback that handles init errors (lines 614-617)', async() => {
       // Mock init to fail
       const originalInit = StatisticsController.init
       StatisticsController.init = jest.fn().mockRejectedValue(new Error('Init failed'))
       
-      // Find and execute the DOMContentLoaded callback
-      const domCallback = global.document.addEventListener.mock.calls
-        .find(call => call[0] === 'DOMContentLoaded')?.[1]
-      
-      if (domCallback) {
-        // Execute the callback and wait for the promise to resolve/reject
-        domCallback().catch(() => {
-          setTimeout(() => {
-            expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Failed to initialize:', expect.any(Error))
-            StatisticsController.init = originalInit
-            done()
-          }, 10)
-        })
-      } else {
-        done()
+      try {
+        // Find and execute the DOMContentLoaded callback
+        const domCallback = document.addEventListener.mock.calls
+          .find(call => call[0] === 'DOMContentLoaded')?.[1]
+        
+        if (domCallback) {
+          // Execute the callback and wait for the promise to resolve/reject
+          await domCallback()
+          // Wait for error to be logged
+          await new Promise(resolve => setTimeout(resolve, 10))
+          expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Failed to initialize:', expect.any(Error))
+        }
+      } finally {
+        StatisticsController.init = originalInit
       }
     })
 
@@ -213,7 +230,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       const destroySpy = jest.spyOn(StatisticsController, 'destroy').mockImplementation(() => {})
       
       // Find and execute the beforeunload callback
-      const beforeUnloadCallback = global.window.addEventListener.mock.calls
+      const beforeUnloadCallback = window.addEventListener.mock.calls
         .find(call => call[0] === 'beforeunload')?.[1]
       
       if (beforeUnloadCallback) {
@@ -229,8 +246,8 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
   describe('UI Updates Coverage', () => {
     test('should handle cacheElements', () => {
       StatisticsController.cacheElements()
-      expect(global.document.getElementById).toHaveBeenCalledWith('loading-state')
-      expect(global.document.getElementById).toHaveBeenCalledWith('stats-content')
+      expect(document.getElementById).toHaveBeenCalledWith('loading-state')
+      expect(document.getElementById).toHaveBeenCalledWith('stats-content')
     })
 
     test('should handle updateOverviewStats with full data', () => {
@@ -307,8 +324,8 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
 
     test('should handle addAnimations', () => {
       StatisticsController.addAnimations()
-      expect(global.document.querySelectorAll).toHaveBeenCalledWith('.stat-card')
-      expect(global.document.querySelectorAll).toHaveBeenCalledWith('.section')
+      expect(document.querySelectorAll).toHaveBeenCalledWith('.stat-card')
+      expect(document.querySelectorAll).toHaveBeenCalledWith('.section')
     })
 
     test('should handle showContent', () => {
@@ -439,13 +456,16 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       const originalCacheElements = StatisticsController.cacheElements
       StatisticsController.cacheElements = jest.fn(() => { throw new Error('Cache failed') })
       
-      await StatisticsController.init()
-      expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Initialization error:', expect.any(Error))
-      
-      StatisticsController.cacheElements = originalCacheElements
+      try {
+        await StatisticsController.init()
+        expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Initialization error:', expect.any(Error))
+      } finally {
+        StatisticsController.cacheElements = originalCacheElements
+      }
     })
 
     test('should handle setupEventListeners', () => {
+      StatisticsController.cacheElements() // Need to cache elements first
       StatisticsController.setupEventListeners()
       expect(console.log).toHaveBeenCalledWith('[UWB Statistics] Event listeners setup complete')
     })
