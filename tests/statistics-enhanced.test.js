@@ -72,6 +72,19 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
     delete require.cache[require.resolve('../statistics.js')]
     require('../statistics.js')
     StatisticsController = global.window.StatisticsController
+    
+    // Set up spies on the actual document and window methods after script loads
+    jest.spyOn(document, 'getElementById').mockImplementation(() => createMockElement())
+    jest.spyOn(document, 'querySelector').mockImplementation(() => createMockElement())
+    jest.spyOn(document, 'querySelectorAll').mockImplementation(() => [createMockElement(), createMockElement()])
+    jest.spyOn(document, 'createElement').mockImplementation(() => createMockElement())
+    jest.spyOn(document, 'addEventListener').mockImplementation(() => {})
+    jest.spyOn(window, 'setInterval').mockImplementation((callback, _interval) => {
+      setTimeout(callback, 0)
+      return 12345
+    })
+    jest.spyOn(window, 'clearInterval').mockImplementation(() => {})
+    jest.spyOn(window, 'addEventListener').mockImplementation(() => {})
   })
 
   afterEach(() => {
@@ -399,7 +412,7 @@ describe('Statistics Controller Enhanced Coverage Tests', () => {
       chrome.runtime.sendMessage.mockImplementation((msg, cb) => cb({ error: 'Refresh failed' }))
       
       await StatisticsController.refreshData()
-      expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error refreshing data:', expect.any(Error))
+      expect(console.error).toHaveBeenCalledWith('[UWB Statistics] Error loading statistics:', expect.any(Error))
     })
 
     test('should handle loadStatistics', async() => {
