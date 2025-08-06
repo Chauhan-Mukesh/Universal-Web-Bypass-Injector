@@ -103,17 +103,166 @@ Our extension implements several security measures:
 - **Code Analysis**: Static code analysis for security issues
 - **Manual Testing**: Regular manual security testing
 
+## 🔧 Security Fixes Applied
+
+### 📋 Recent Security Improvements
+
+#### **Medium Severity Issues Fixed**
+
+##### 1. Overly Permissive Content Security Policy
+**Issue**: The original CSP allowed `object-src 'self'` which could potentially be exploited.
+
+**Fix Applied**:
+```json
+"content_security_policy": {
+  "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
+}
+```
+
+**Security Improvement**:
+- Changed `object-src 'self'` to `object-src 'none'` to prevent object/embed injections
+- Added `base-uri 'self'` to prevent base tag injections
+- Added `frame-ancestors 'none'` to prevent framing attacks
+
+##### 2. Insecure External Connectivity Configuration
+**Issue**: The extension allowed connections from both HTTP and HTTPS origins.
+
+**Fix Applied**:
+```json
+"externally_connectable": {
+  "matches": ["https://*/*"]
+}
+```
+
+**Security Improvement**:
+- Removed HTTP support (`http://*/*`) to enforce HTTPS-only connections
+- Prevents man-in-the-middle attacks on insecure connections
+- Ensures all external communications are encrypted
+
+#### **Low Severity Issues Fixed**
+
+##### 1. Content Security Policy Enhancement
+**Issue**: The CSP lacked comprehensive security directives.
+
+**Fix Applied**:
+- Enhanced CSP with additional security directives
+- Implemented defense-in-depth security approach
+- Added comprehensive frame protection
+
+### 🔒 CI/CD Security Improvements
+
+#### TruffleHog Secret Scanning Fix
+**Issue**: Secret scanning failed due to BASE and HEAD commits being identical.
+
+**Fix Applied**:
+- Implemented context-aware scanning logic
+- Added fallback for single commit scenarios
+- Enhanced error handling for different trigger contexts (PR, push, schedule)
+- Improved scan coverage without false positives
+
+**Benefits**:
+- Reliable secret detection across all CI/CD scenarios
+- Prevents accidental secret commits
+- Enhanced security monitoring
+
+### 🧪 Security Test Enhancements
+
+#### Fixed Skipped Security Tests
+**Issue**: Critical tests were being skipped, reducing security validation coverage.
+
+**Fix Applied**:
+- Fixed installation event handling tests
+- Enhanced welcome notification security tests
+- Improved mock setup for comprehensive testing
+
+**Benefits**:
+- 100% test execution (0 skipped tests)
+- Enhanced security test coverage
+- Better validation of security-critical functionality
+
+### 📊 Security Impact Assessment
+
+#### Before Fixes
+- 📊 Total Issues: 3
+- 🚨 Critical: 0
+- ⚠️ High: 0  
+- 📋 Medium: 2
+- ℹ️ Low: 1
+
+#### After Fixes
+- ✅ Total Issues: 0
+- ✅ All medium and low severity issues resolved
+- ✅ Enhanced security posture beyond initial requirements
+- ✅ Comprehensive CI/CD security validation
+
+### ✅ Security Validation
+
+All security fixes have been validated through:
+1. **Static Analysis**: ESLint security rules pass
+2. **Manifest Validation**: Chrome extension security requirements met
+3. **Automated Testing**: All security tests pass
+4. **Secret Scanning**: TruffleHog scans complete successfully
+5. **Build Validation**: Extension builds without security warnings
+
 ## 📚 Security Resources
 
 ### 🔗 Useful Links
 - [Chrome Extension Security](https://developer.chrome.com/docs/extensions/mv3/security/)
 - [Web Security Guidelines](https://web.dev/security/)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [Content Security Policy Level 3](https://w3c.github.io/webappsec-csp/)
 
-### 📖 Security Documentation
-- [Extension Architecture Security](docs/security-architecture.md)
-- [Security Testing Guidelines](docs/security-testing.md)
-- [Incident Response Plan](docs/incident-response.md)
+### 🛡️ Security Development Guidelines
+
+#### Secure Coding Practices
+- **Input Validation**: Validate all user inputs and external data
+- **Output Encoding**: Properly encode data before rendering
+- **Error Handling**: Implement secure error handling without information disclosure
+- **Authentication**: Use secure authentication mechanisms
+- **Authorization**: Implement proper access controls
+
+#### Extension-Specific Security
+- **Manifest Permissions**: Request minimal required permissions
+- **Content Script Security**: Avoid `eval()` and unsafe DOM manipulation
+- **Message Passing**: Validate all messages between extension components
+- **External Communication**: Use HTTPS-only connections
+- **Data Storage**: Encrypt sensitive data in extension storage
+
+### 🔍 Security Testing Checklist
+
+- [ ] **Static Analysis**: Code scanning for vulnerabilities
+- [ ] **Dynamic Analysis**: Runtime security testing
+- [ ] **Dependency Scanning**: Third-party library vulnerability assessment
+- [ ] **Penetration Testing**: Manual security testing
+- [ ] **Code Review**: Security-focused code reviews
+
+### 📋 Ongoing Security Recommendations
+
+1. **Regular Security Audits**: Continue running security scans in CI/CD
+2. **Dependency Monitoring**: Monitor npm dependencies for vulnerabilities
+3. **Permission Review**: Regularly review extension permissions for necessity
+4. **CSP Monitoring**: Consider further CSP restrictions as extension evolves
+5. **HTTPS Enforcement**: Maintain HTTPS-only external connections
+
+### 🚨 Security Incident Response
+
+#### Immediate Response (0-24 hours)
+1. **Assess Impact**: Determine scope and severity
+2. **Contain Threat**: Implement immediate containment measures
+3. **Notify Stakeholders**: Inform relevant parties
+4. **Document Incident**: Record all details and actions taken
+
+#### Short-term Response (1-7 days)
+1. **Investigate Root Cause**: Determine how the incident occurred
+2. **Develop Fix**: Create and test security patches
+3. **Deploy Solution**: Implement fixes across all environments
+4. **Verify Resolution**: Confirm the incident is resolved
+
+#### Long-term Response (1-4 weeks)
+1. **Post-Incident Review**: Analyze incident response effectiveness
+2. **Update Procedures**: Improve security processes based on lessons learned
+3. **Security Training**: Provide additional training if needed
+4. **Monitor**: Enhanced monitoring for similar threats
 
 ## 🤝 Security Contact
 
@@ -122,7 +271,15 @@ For any security-related questions or concerns:
 - **Primary Contact**: chauhan.mukesh0203@gmail.com
 - **GitHub**: [@Chauhan-Mukesh](https://github.com/Chauhan-Mukesh)
 - **Response Time**: Within 48 hours
+- **Emergency Contact**: For critical security issues, mark email as [URGENT SECURITY]
+
+### 📞 Security Communication Guidelines
+
+- **Public Issues**: Use GitHub Issues for general security discussions
+- **Private Vulnerabilities**: Email directly for sensitive security issues
+- **Security Research**: Contact us before public disclosure
+- **Community Security**: Join GitHub Discussions for security best practices
 
 ---
 
-*This security policy is regularly updated to reflect current best practices and requirements.*
+*This security policy is regularly updated to reflect current best practices and requirements. Last updated after consolidating security fixes documentation.*

@@ -313,9 +313,10 @@ git push origin v1.2.3  # Trigger automated release
 
 ### 📚 Documentation
 
-- **[CI/CD Workflow Guide](docs/CI-CD-WORKFLOW.md)** - Comprehensive pipeline documentation
+- **[Development Guide](DEVELOPMENT.md)** - Complete technical documentation for developers
 - **[Contributing Guidelines](CONTRIBUTING.md)** - Development and contribution process
 - **[Security Policy](SECURITY.md)** - Security practices and vulnerability reporting
+- **[Project TODO](TODO.md)** - Comprehensive task list and roadmap
 
 ## 🔒 Privacy & Security
 
@@ -364,7 +365,7 @@ git push origin v1.2.3  # Trigger automated release
 - **🎯 Targeted Selectors**: Optimized CSS selector usage for faster detection
 - **📊 Performance Monitoring**: Built-in performance tracking and logging
 
-See [PERFORMANCE.md](./PERFORMANCE.md) for detailed performance guidelines and benchmarks.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed performance guidelines and benchmarks.
 
 ### Architecture
 - **Service Worker**: Background processing with event-driven architecture

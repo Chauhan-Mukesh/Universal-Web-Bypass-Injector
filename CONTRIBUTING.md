@@ -309,6 +309,7 @@ function removePaywallElements(selectors, restoreScroll = true) {
 - [JavaScript MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
 - [ESLint Documentation](https://eslint.org/docs/rules/)
+- [Development Guide](DEVELOPMENT.md) - Complete technical documentation
 
 ## 🏆 Recognition
 
