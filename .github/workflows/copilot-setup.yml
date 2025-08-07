@@ -1,0 +1,38 @@
+# This workflow prepares the environment for the GitHub Copilot coding agent.
+# It is run automatically whenever an issue is assigned to @copilot.
+
+name: "Copilot Environment Setup"
+
+on:
+  workflow_dispatch: # Allows manual triggering from the Actions tab for testing and validation.
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        # This step installs Node.js for the JavaScript Chrome extension project.
+        # Version 20 is required as specified in package.json engines field.
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Match the project's required Node.js version from package.json
+          cache: 'npm' # Enable npm caching for faster builds
+
+      - name: Install NPM Dependencies
+        # Installs JavaScript dependencies defined in package.json.
+        # Uses npm ci for reproducible builds and faster installs.
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Verify Environment Setup
+        # Validates that the environment is properly configured for development.
+        run: |
+          echo "✅ Environment setup completed successfully!"
+          echo "Node.js version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "📦 Installed packages:"
+          npm list --depth=0
+          echo "🧪 Running quick validation..."
+          npm run validate:quick
