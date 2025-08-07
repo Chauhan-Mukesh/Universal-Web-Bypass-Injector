@@ -1,0 +1,16 @@
+{
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "extends": ["../../eslint.config.js"],
+  "globals": {
+    "test": "readonly",
+    "expect": "readonly",
+    "describe": "readonly",
+    "beforeAll": "readonly",
+    "afterAll": "readonly",
+    "beforeEach": "readonly",
+    "afterEach": "readonly"
+  }
+}

@@ -1,14 +1,20 @@
 # This workflow prepares the environment for the GitHub Copilot coding agent.
 # It is run automatically whenever an issue is assigned to @copilot.
+# Includes browser automation setup for proper Chrome extension testing.
 
 name: "Copilot Environment Setup"
 
 on:
   workflow_dispatch: # Allows manual triggering from the Actions tab for testing and validation.
 
+env:
+  NODE_VERSION: '20'
+  PLAYWRIGHT_BROWSERS_PATH: '0' # Use system browsers
+
 jobs:
   setup:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -18,13 +24,53 @@ jobs:
         # Version 20 is required as specified in package.json engines field.
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Match the project's required Node.js version from package.json
-          cache: 'npm' # Enable npm caching for faster builds
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: Install NPM Dependencies
         # Installs JavaScript dependencies defined in package.json.
         # Uses npm ci for reproducible builds and faster installs.
         run: npm ci --prefer-offline --no-audit
+
+      - name: Install Browser Automation Dependencies
+        # Adds Playwright for browser automation testing of Chrome extension
+        run: |
+          echo "📦 Installing browser automation dependencies..."
+          npm install --save-dev playwright
+          echo "✅ Playwright installed successfully"
+
+      - name: Setup Chrome for Extension Testing (Optional)
+        # Install Google Chrome if available for extension testing
+        run: |
+          echo "🌐 Attempting to install Google Chrome..."
+          if command -v wget >/dev/null 2>&1; then
+            # Try to install Chrome, but don't fail if it doesn't work
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/google-chrome.gpg >/dev/null 2>&1 || true
+            echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null 2>&1 || true
+            sudo apt-get update -qq >/dev/null 2>&1 || true
+            sudo apt-get install -y google-chrome-stable >/dev/null 2>&1 || true
+            
+            if command -v google-chrome >/dev/null 2>&1; then
+              echo "✅ Chrome installed: $(google-chrome --version)"
+            else
+              echo "⚠️ Chrome installation failed, will use Node.js testing only"
+            fi
+          else
+            echo "⚠️ wget not available, skipping Chrome installation"
+          fi
+
+      - name: Setup Display for Headless Testing (Optional)
+        # Configure virtual display for browser automation if needed
+        run: |
+          echo "🖥️ Setting up virtual display for headless testing..."
+          if sudo apt-get install -y xvfb >/dev/null 2>&1; then
+            export DISPLAY=:99
+            Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+            echo "DISPLAY=:99" >> $GITHUB_ENV
+            echo "✅ Virtual display configured"
+          else
+            echo "⚠️ Virtual display setup failed, continuing without it"
+          fi
 
       - name: Verify Environment Setup
         # Validates that the environment is properly configured for development.
@@ -32,7 +78,15 @@ jobs:
           echo "✅ Environment setup completed successfully!"
           echo "Node.js version: $(node --version)"
           echo "NPM version: $(npm --version)"
+          echo "Chrome: $(command -v google-chrome >/dev/null 2>&1 && google-chrome --version || echo 'Not installed')"
+          echo "Display: ${DISPLAY:-'Not set'}"
           echo "📦 Installed packages:"
           npm list --depth=0
           echo "🧪 Running quick validation..."
           npm run validate:quick
+
+      - name: Test Browser Automation Setup
+        # Verify browser automation capabilities are working
+        run: |
+          echo "🧪 Testing browser automation setup..."
+          node scripts/test-browser-automation.js
