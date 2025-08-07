@@ -24,6 +24,8 @@ const INCLUDE_FILES = [
   'content.js',
   'popup.js',
   'popup.html',
+  'settings.html',
+  'settings.js',
   'statistics.html',
   'statistics.js',
   'logo.png'
