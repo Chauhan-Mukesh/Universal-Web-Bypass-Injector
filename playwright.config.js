@@ -6,7 +6,7 @@ const { defineConfig, devices } = require('@playwright/test');
  * Optimized for Chrome extension testing and automation
  */
 module.exports = defineConfig({
-  testDir: './tests/browser',
+  testDir: './e2e-tests',
   
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
@@ -103,8 +103,8 @@ module.exports = defineConfig({
   ],
 
   /* Global setup and teardown */
-  globalSetup: require.resolve('./tests/browser/global-setup.js'),
-  globalTeardown: require.resolve('./tests/browser/global-teardown.js'),
+  globalSetup: require.resolve('./e2e-tests/global-setup.js'),
+  globalTeardown: require.resolve('./e2e-tests/global-teardown.js'),
 
   /* Run your local dev server before starting the tests */
   // webServer: {

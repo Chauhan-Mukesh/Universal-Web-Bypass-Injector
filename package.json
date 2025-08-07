@@ -57,7 +57,8 @@
       "<rootDir>/tests/setup.js"
     ],
     "testMatch": [
-      "<rootDir>/tests/**/*.test.js"
+      "<rootDir>/tests/**/*.test.js",
+      "!<rootDir>/tests/browser/**/*.test.js"
     ],
     "collectCoverageFrom": [
       "*.js",
