@@ -177,6 +177,7 @@ const SettingsController = {
     } catch (error) {
       console.error('[UWB Settings] Error loading settings:', error)
       this.showMessage('Failed to load settings', 'error')
+      throw error
     }
   },
 
@@ -187,8 +188,10 @@ const SettingsController = {
   async saveSettings() {
     try {
       // Show saving feedback
-      this.elements.saveSettingsBtn.textContent = 'Saving...'
-      this.elements.saveSettingsBtn.disabled = true
+      if (this.elements.saveSettingsBtn) {
+        this.elements.saveSettingsBtn.textContent = 'Saving...'
+        this.elements.saveSettingsBtn.disabled = true
+      }
 
       await chrome.storage.sync.set({
         uwb_settings: this.settings,
@@ -198,8 +201,10 @@ const SettingsController = {
       this.showMessage('Settings saved successfully', 'success')
       
       // Reset button
-      this.elements.saveSettingsBtn.textContent = 'Save Settings'
-      this.elements.saveSettingsBtn.disabled = false
+      if (this.elements.saveSettingsBtn) {
+        this.elements.saveSettingsBtn.textContent = 'Save Settings'
+        this.elements.saveSettingsBtn.disabled = false
+      }
 
       console.log('[UWB Settings] Settings saved')
     } catch (error) {
@@ -207,8 +212,11 @@ const SettingsController = {
       this.showMessage('Failed to save settings', 'error')
       
       // Reset button
-      this.elements.saveSettingsBtn.textContent = 'Save Settings'
-      this.elements.saveSettingsBtn.disabled = false
+      if (this.elements.saveSettingsBtn) {
+        this.elements.saveSettingsBtn.textContent = 'Save Settings'
+        this.elements.saveSettingsBtn.disabled = false
+      }
+      throw error
     }
   },
 
@@ -218,12 +226,15 @@ const SettingsController = {
    * @private
    */
   toggleSetting(settingName) {
-    this.settings[settingName] = !this.settings[settingName]
-    this.updateUI()
-    
-    // Apply dark mode immediately
-    if (settingName === 'darkMode') {
-      this.applyTheme()
+    // Only toggle if the setting is boolean
+    if (typeof this.settings[settingName] === 'boolean') {
+      this.settings[settingName] = !this.settings[settingName]
+      this.updateUI()
+      
+      // Apply dark mode immediately
+      if (settingName === 'darkMode') {
+        this.applyTheme()
+      }
     }
   },
 
@@ -372,6 +383,11 @@ const SettingsController = {
           case 'S':
             event.preventDefault()
             this.saveSettings()
+            break
+          case 'r':
+          case 'R':
+            event.preventDefault()
+            this.resetSettings()
             break
           case 'z':
           case 'Z':
