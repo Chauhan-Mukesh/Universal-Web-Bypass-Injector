@@ -330,6 +330,7 @@ const PopupController = {
     try {
       this.updateCurrentUrl()
       this.updateStatus()
+      this.updateStatusIndicator()
       this.updateSiteToggle()
       this.updateStatistics()
       this.updateVersion()
@@ -399,8 +400,44 @@ const PopupController = {
       const isEnabled = this.siteStatus.enabled
       this.elements.siteToggle.className = isEnabled ? 'toggle-switch active' : 'toggle-switch'
       this.elements.siteToggle.setAttribute('aria-checked', isEnabled.toString())
+      
+      // Update checkbox if it exists
+      const checkbox = document.getElementById('site-enabled')
+      if (checkbox) {
+        checkbox.checked = isEnabled
+      }
     } catch (error) {
       console.error('[UWB Popup] Error updating site toggle:', error)
+    }
+  },
+
+  /**
+   * Handles site toggle click (alias for toggleSiteStatus).
+   * @public
+   */
+  async handleSiteToggle() {
+    return this.toggleSiteStatus()
+  },
+
+  /**
+   * Updates the status indicator display.
+   * @private
+   */
+  updateStatusIndicator() {
+    try {
+      if (!this.elements.statusDot || !this.elements.statusText) return
+
+      const isEnabled = this.siteStatus.enabled
+      
+      if (isEnabled) {
+        this.elements.statusDot.className = 'status-dot active'
+        this.elements.statusText.textContent = 'Active'
+      } else {
+        this.elements.statusDot.className = 'status-dot disabled'
+        this.elements.statusText.textContent = 'Disabled'
+      }
+    } catch (error) {
+      console.error('[UWB Popup] Error updating status indicator:', error)
     }
   },
 
@@ -566,32 +603,29 @@ const PopupController = {
         return
       }
 
-      const newStatus = !this.siteStatus.enabled
-      
       // Add visual feedback
       if (this.elements.siteToggle) {
         this.elements.siteToggle.style.opacity = '0.6'
       }
 
       const response = await this.sendMessage({
-        action: 'setSiteStatus',
-        hostname: this.siteStatus.hostname,
-        enabled: newStatus
+        action: 'toggleSite',
+        hostname: this.siteStatus.hostname
       })
 
       if (response && !response.error) {
-        this.siteStatus.enabled = newStatus
+        this.siteStatus.enabled = response.enabled
         this.updateUI()
         
         // Show feedback message
-        const message = newStatus 
+        const message = response.enabled 
           ? `Extension enabled for ${this.siteStatus.hostname}`
           : `Extension disabled for ${this.siteStatus.hostname}`
         
         this.showMessage(message, 'success')
         
         // Refresh page if disabled
-        if (!newStatus && this.currentTab && this.currentTab.id) {
+        if (!response.enabled && this.currentTab && this.currentTab.id) {
           setTimeout(() => {
             chrome.tabs.reload(this.currentTab.id)
           }, 1000)

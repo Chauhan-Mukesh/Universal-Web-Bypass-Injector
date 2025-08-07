@@ -286,6 +286,12 @@ const BackgroundService = {
         case 'getSiteStatus':
           this.handleGetSiteStatus(request, sender, sendResponse)
           break
+        case 'checkSiteStatus':
+          this.handleCheckSiteStatus(request, sender, sendResponse)
+          break
+        case 'toggleSite':
+          this.handleToggleSite(request, sender, sendResponse)
+          break
         case 'setSiteStatus':
           this.handleSetSiteStatus(request, sender, sendResponse)
           break
@@ -370,6 +376,98 @@ const BackgroundService = {
       console.error('[UWB Background] Error getting site status:', error)
       sendResponse({ error: error.message })
     }
+  },
+
+  /**
+   * Handles site status check (for content scripts).
+   * @param {Object} request - Request object.
+   * @param {Object} sender - Message sender.
+   * @param {Function} sendResponse - Response callback.
+   * @private
+   */
+  handleCheckSiteStatus(request, sender, sendResponse) {
+    try {
+      const hostname = request.hostname
+      const disabled = this.disabledSites.has(hostname)
+      
+      if (disabled) {
+        sendResponse({ success: false, disabled: true })
+      } else {
+        sendResponse({ success: true, disabled: false })
+      }
+    } catch (error) {
+      console.error('[UWB Background] Error checking site status:', error)
+      sendResponse({ error: error.message })
+    }
+  },
+
+  /**
+   * Handles site toggle requests.
+   * @param {Object} request - Request object.
+   * @param {Object} sender - Message sender.
+   * @param {Function} sendResponse - Response callback.
+   * @private
+   */
+  async handleToggleSite(request, sender, sendResponse) {
+    try {
+      const hostname = request.hostname
+      const wasEnabled = !this.disabledSites.has(hostname)
+      
+      if (wasEnabled) {
+        this.disabledSites.add(hostname)
+      } else {
+        this.disabledSites.delete(hostname)
+      }
+
+      await this.saveStorageData()
+      
+      const enabled = !this.disabledSites.has(hostname)
+      sendResponse({ success: true, enabled, hostname })
+    } catch (error) {
+      console.error('[UWB Background] Error toggling site:', error)
+      sendResponse({ error: error.message })
+    }
+  },
+
+  /**
+   * Gets site status information.
+   * @param {string} hostname - Site hostname.
+   * @returns {Object} Site status object.
+   * @public
+   */
+  getSiteStatus(hostname) {
+    const enabled = !this.disabledSites.has(hostname)
+    return { enabled, hostname }
+  },
+
+  /**
+   * Toggles site status.
+   * @param {string} hostname - Site hostname.
+   * @returns {Promise<Object>} Updated site status.
+   * @public
+   */
+  async toggleSite(hostname) {
+    const wasEnabled = !this.disabledSites.has(hostname)
+    
+    if (wasEnabled) {
+      this.disabledSites.add(hostname)
+    } else {
+      this.disabledSites.delete(hostname)
+    }
+
+    await this.saveStorageData()
+    
+    const enabled = !this.disabledSites.has(hostname)
+    return { enabled, hostname }
+  },
+
+  /**
+   * Saves storage data (alias for saveStorageData).
+   * @returns {Promise<void>}
+   * @public
+   */
+  async saveStorage() {
+    return this.saveStorageData()
   },
 
   /**
@@ -653,7 +751,16 @@ const BackgroundService = {
           this.executeBypassOnTab(tab.id)
           break
         case 'openPopup':
-          chrome.action.openPopup()
+          // Use chrome.action.openPopup with proper error handling for Chrome 114+
+          if (chrome.action && chrome.action.openPopup) {
+            try {
+              chrome.action.openPopup()
+            } catch (_error) {
+              // Fallback: If openPopup fails (requires user activation), 
+              // the popup will open naturally when user clicks the action button
+              console.log('[UWB Background] Popup requires user activation, will open on next action click')
+            }
+          }
           break
         default:
           console.log(`[UWB Background] Unknown context menu item: ${info.menuItemId}`)

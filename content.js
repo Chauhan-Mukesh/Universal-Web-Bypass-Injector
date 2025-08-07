@@ -177,12 +177,80 @@
         's-f\\.scribdassets\\.com',
         'chartbeat_mab\\.js',
         
-        // Anti-Adblock Detection
+        // Anti-Adblock Detection (Enhanced 2024)
         'fuckadblock\\.js',
         'adblock-detector',
         'blockadblock',
         'anti-adblock',
-        'adblock\\.js'
+        'adblock\\.js',
+        'detector\\.js',
+        'blocker-detector',
+        'adblocker-detector',
+        'antiblock',
+        
+        // Enhanced Trackers & Analytics (Latest 2024)
+        'clarity\\.ms',
+        'microsoft\\.com/clarity',
+        'bing\\.com/ck',
+        'quantummetric',
+        'sessioncam\\.com',
+        'decibelinsight\\.net',
+        'glassbox-cdn\\.com',
+        'getblueshift\\.com',
+        'bugsnag\\.com',
+        'sentry\\.io',
+        'rollbar\\.com',
+        'trackjs\\.com',
+        'datadog-rum',
+        'appdynamics\\.com',
+        'splunk\\.com/rum',
+        
+        // Latest Ad Networks & RTB (2024)
+        'contextweb\\.com',
+        'casalemedia\\.com',
+        'brightroll\\.com',
+        'turn\\.com',
+        'adsystem\\.com',
+        'advertising\\.com',
+        'adform\\.net',
+        'admixer\\.net',
+        'adsystem\\.com',
+        'smartclip\\.net',
+        'smaato\\.net',
+        'mopub\\.com',
+        'unity3d\\.com/ads',
+        'ironsrc\\.com',
+        'applovin\\.com',
+        'chartboost\\.com',
+        'vungle\\.com',
+        'flurry\\.com',
+        
+        // Enhanced Privacy & Compliance (2024)
+        'usercentrics\\.com',
+        'cookiebot\\.com',
+        'termly\\.io',
+        'iubenda\\.com',
+        'quantcast\\.com/choice',
+        'consentmanager\\.net',
+        'cookiefirst\\.com',
+        'klaro\\.org',
+        'complianz\\.io',
+        
+        // Social & Marketing Trackers (Latest)
+        'tiktok\\.com/i18n',
+        'reddit\\.com/api',
+        'linkedin\\.com/li',
+        'snapchat\\.com/tr',
+        'pinterest\\.com/tr',
+        'youtube\\.com/youtubei',
+        'instagram\\.com/tr',
+        'twitter\\.com/i/jot',
+        
+        // Enhanced CDN & Widgets (2024)
+        'jsdelivr\\.net/npm/.*analytics',
+        'unpkg\\.com/.*tracking',
+        'cdnjs\\.cloudflare\\.com/.*tracker',
+        'stackpath\\.bootstrapcdn\\.com/.*analytics'
       ].map(pattern => new RegExp('^https?://([^/]+\\.)?' + pattern, 'i')),
 
       SELECTORS_TO_REMOVE: [
@@ -197,7 +265,7 @@
         '.adb-detector',
         '.anti-ad-blocker',
         
-        // Paywalls/Overlays - more specific
+        // Enhanced Paywall & Content Gates (2024)
         '.paywall-overlay',
         '.paywall-modal',
         '.subscription-overlay',
@@ -212,6 +280,22 @@
         '.piano-template-modal',
         '.tp-modal',
         '.paid-content-overlay',
+        '.premium-content-gate',
+        '.subscriber-only-content',
+        '.membership-gate',
+        '.access-control-modal',
+        '.content-access-gate',
+        '.premium-article-overlay',
+        '.subscription-prompt',
+        '.upgrade-modal',
+        '.trial-modal',
+        '.subscribe-modal',
+        '[data-paywall]',
+        '[data-premium-content]',
+        '[data-subscription-required]',
+        '.meter-modal',
+        '.article-limit-modal',
+        '.free-articles-modal',
         
         // High z-index overlays (commonly used for paywalls)
         '[style*="z-index: 999999"]',
@@ -241,7 +325,62 @@
         '.newsletter-signup-overlay',
         '.email-capture-modal',
         
-        // Cookie/GDPR banners (commonly problematic)
+        // Enhanced Anti-Adblock Dialogs (2024)
+        '[data-adblock-detected]',
+        '[data-ad-blocker]',
+        '.adblock-warning',
+        '.adblocker-warning',
+        '.ad-blocker-detected',
+        '.please-disable-adblock',
+        '.turn-off-adblocker',
+        '.whitelist-site',
+        '.adblocker-message',
+        '.adblock-notification',
+        '[class*="adblocker-"][class*="popup"]',
+        '[class*="adblock-"][class*="notice"]',
+        
+        // Enhanced Cookie/GDPR Overlays (2024)
+        '.cookie-banner[style*="fixed"]',
+        '.gdpr-banner[style*="fixed"]',
+        '[class*="cookie"][class*="banner"][style*="z-index"]',
+        '.consent-banner',
+        '.privacy-banner',
+        '.onetrust-banner-sdk',
+        '.cookielaw-banner',
+        '.cc-banner',
+        '.cookie-consent-banner',
+        '.gdpr-consent-tool',
+        '#cookiescript_injected',
+        '#cookie-law-info-bar',
+        '.cookie-notice-hidden',
+        '.eu-cookie-compliance-banner',
+        
+        // Enhanced Newsletter/Email Capture (2024)
+        '.newsletter-modal',
+        '.email-signup-modal',
+        '.subscription-modal',
+        '.newsletter-popup',
+        '.email-capture',
+        '.newsletter-overlay',
+        '.signup-overlay',
+        '.email-gate',
+        '.newsletter-gate',
+        '[data-newsletter-modal]',
+        '[data-email-capture]',
+        '.mailchimp-popup',
+        '.convertkit-modal',
+        
+        // Enhanced Social Media Overlays (2024)
+        '.social-share-overlay',
+        '.social-login-modal',
+        '.facebook-login-overlay',
+        '.google-login-overlay',
+        '.social-gate',
+        '.share-gate',
+        '[data-social-login]',
+        '.social-wall',
+        
+        // Enhanced Cookie/GDPR Overlays (2024)
         '.cookie-banner[style*="fixed"]',
         '.gdpr-banner[style*="fixed"]',
         '[class*="cookie"][class*="banner"][style*="z-index"]',
