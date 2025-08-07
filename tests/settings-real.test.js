@@ -118,7 +118,7 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(typeof SettingsController.settings.aggressiveBlocking).toBe('boolean')
   })
 
-  test('should initialize successfully', async () => {
+  test('should initialize successfully', async() => {
     await SettingsController.init()
     
     expect(SettingsController.elements).toBeDefined()
@@ -142,13 +142,13 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(SettingsController.elements.saveSettingsBtn).toBeTruthy()
   })
 
-  test('should load settings from storage', async () => {
+  test('should load settings from storage', async() => {
     await SettingsController.loadSettings()
     
     expect(chrome.storage.local.get).toHaveBeenCalledWith(['uwb_settings', 'uwb_theme_preference'])
   })
 
-  test('should save settings to storage', async () => {
+  test('should save settings to storage', async() => {
     SettingsController.settings.darkMode = true
     
     await SettingsController.saveSettings()
@@ -194,7 +194,7 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(document.body.classList.contains('dark-theme')).toBe(false)
   })
 
-  test('should clear statistics when confirmed', async () => {
+  test('should clear statistics when confirmed', async() => {
     global.confirm = jest.fn(() => true)
     
     await SettingsController.clearStatistics()
@@ -203,7 +203,7 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'resetStats' })
   })
 
-  test('should not clear statistics when cancelled', async () => {
+  test('should not clear statistics when cancelled', async() => {
     global.confirm = jest.fn(() => false)
     chrome.runtime.sendMessage.mockClear()
     
@@ -213,7 +213,7 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 
-  test('should reset settings when confirmed', async () => {
+  test('should reset settings when confirmed', async() => {
     global.confirm = jest.fn(() => true)
     SettingsController.settings.darkMode = true
     
@@ -223,7 +223,7 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(SettingsController.settings.darkMode).toBe(false)
   })
 
-  test('should not reset settings when cancelled', async () => {
+  test('should not reset settings when cancelled', async() => {
     global.confirm = jest.fn(() => false)
     const originalSettings = { ...SettingsController.settings }
     
@@ -272,21 +272,21 @@ describe('SettingsController Real Coverage Tests', () => {
     expect(SettingsController.goBack).toHaveBeenCalled()
   })
 
-  test('should handle errors in loadSettings', async () => {
+  test('should handle errors in loadSettings', async() => {
     chrome.storage.local.get.mockRejectedValue(new Error('Storage error'))
     
     await expect(SettingsController.loadSettings()).rejects.toThrow('Storage error')
     expect(console.error).toHaveBeenCalled()
   })
 
-  test('should handle errors in saveSettings', async () => {
+  test('should handle errors in saveSettings', async() => {
     chrome.storage.local.set.mockRejectedValue(new Error('Storage error'))
     
     await expect(SettingsController.saveSettings()).rejects.toThrow('Storage error')
     expect(console.error).toHaveBeenCalled()
   })
 
-  test('should handle errors in clearStatistics', async () => {
+  test('should handle errors in clearStatistics', async() => {
     global.confirm = jest.fn(() => true)
     chrome.runtime.sendMessage.mockRejectedValue(new Error('Runtime error'))
     

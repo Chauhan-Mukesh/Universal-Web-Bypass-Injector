@@ -118,10 +118,10 @@ describe('SettingsController Tests', () => {
     try {
       const settingsCode = settingsContent.replace(/chrome\./g, 'global.chrome.');
       eval(settingsCode);
-      if (typeof SettingsController !== 'undefined') {
-        mockSettingsController = SettingsController;
+      if (typeof global.SettingsController !== 'undefined') {
+        mockSettingsController = global.SettingsController;
       }
-    } catch (error) {
+    } catch (_error) {
       console.log('Using mock SettingsController due to eval restrictions');
     }
 
@@ -173,14 +173,14 @@ describe('SettingsController Tests', () => {
   })
 
   describe('Settings Management', () => {
-    test('should load settings from chrome storage', async () => {
+    test('should load settings from chrome storage', async() => {
       // Test that the mock chrome API is called
       const result = await chrome.storage.local.get(['uwb_settings', 'uwb_theme_preference'])
       expect(result).toBeDefined()
       expect(chrome.storage.local.get).toHaveBeenCalled()
     })
 
-    test('should save settings to chrome storage', async () => {
+    test('should save settings to chrome storage', async() => {
       const settingsData = {
         uwb_settings: mockSettingsController.settings,
         uwb_theme_preference: mockSettingsController.settings.darkMode ? 'dark' : 'light'
@@ -191,7 +191,7 @@ describe('SettingsController Tests', () => {
     })
 
     test('should toggle boolean settings', () => {
-      const originalValue = mockSettingsController.settings.darkMode
+      const _originalValue = mockSettingsController.settings.darkMode
       mockSettingsController.toggleSetting('darkMode')
       
       if (mockSettingsController.toggleSetting.mockImplementation) {
@@ -225,7 +225,7 @@ describe('SettingsController Tests', () => {
   })
 
   describe('Statistics Management', () => {
-    test('should clear statistics when requested', async () => {
+    test('should clear statistics when requested', async() => {
       // Mock confirm dialog
       global.confirm = jest.fn(() => true)
       
@@ -234,7 +234,7 @@ describe('SettingsController Tests', () => {
       expect(mockSettingsController.clearStatistics).toHaveBeenCalled()
     })
 
-    test('should not clear statistics when cancelled', async () => {
+    test('should not clear statistics when cancelled', async() => {
       // Mock confirm dialog returning false
       global.confirm = jest.fn(() => false)
       
@@ -245,7 +245,7 @@ describe('SettingsController Tests', () => {
   })
 
   describe('Settings Reset', () => {
-    test('should reset settings to defaults when confirmed', async () => {
+    test('should reset settings to defaults when confirmed', async() => {
       // Mock confirm dialog
       global.confirm = jest.fn(() => true)
       
@@ -254,7 +254,7 @@ describe('SettingsController Tests', () => {
       expect(mockSettingsController.resetSettings).toHaveBeenCalled()
     })
 
-    test('should not reset settings when cancelled', async () => {
+    test('should not reset settings when cancelled', async() => {
       // Mock confirm dialog returning false
       global.confirm = jest.fn(() => false)
       
@@ -358,7 +358,7 @@ describe('SettingsController Tests', () => {
   })
 
   describe('Error Handling', () => {
-    test('should handle chrome storage errors gracefully', async () => {
+    test('should handle chrome storage errors gracefully', async() => {
       // Mock chrome storage to throw error
       chrome.storage.local.get.mockImplementation((keys, callback) => {
         if (callback) callback({})
@@ -366,19 +366,19 @@ describe('SettingsController Tests', () => {
       })
 
       // Should not throw even if storage fails
-      expect(async () => {
+      expect(async() => {
         await mockSettingsController.loadSettings()
       }).not.toThrow()
     })
 
-    test('should handle chrome runtime errors gracefully', async () => {
+    test('should handle chrome runtime errors gracefully', async() => {
       // Mock chrome runtime to throw error
       chrome.runtime.sendMessage.mockImplementation(() => {
         throw new Error('Runtime error')
       })
 
       // Should not throw even if runtime fails
-      expect(async () => {
+      expect(async() => {
         await mockSettingsController.clearStatistics()
       }).not.toThrow()
     })
@@ -395,7 +395,7 @@ describe('SettingsController Tests', () => {
   })
 
   describe('Integration Tests', () => {
-    test('should complete full settings flow', async () => {
+    test('should complete full settings flow', async() => {
       // Initialize
       await mockSettingsController.init()
       
@@ -418,7 +418,7 @@ describe('SettingsController Tests', () => {
       expect(mockSettingsController.init).toHaveBeenCalled()
     })
 
-    test('should handle settings persistence', async () => {
+    test('should handle settings persistence', async() => {
       // Change a setting
       mockSettingsController.settings.darkMode = true
       
