@@ -9,7 +9,7 @@ async function globalSetup() {
   console.log('🔧 Setting up global browser test environment...');
   
   // Ensure extension is built
-  const distPath = path.join(__dirname, '../../dist');
+  const distPath = path.join(__dirname, '../dist');
   const manifestPath = path.join(distPath, 'manifest.json');
   
   if (!fs.existsSync(manifestPath)) {
@@ -19,7 +19,7 @@ async function globalSetup() {
     await new Promise((resolve, reject) => {
       const buildProcess = spawn('npm', ['run', 'build:extension'], {
         stdio: 'inherit',
-        cwd: path.join(__dirname, '../..')
+        cwd: path.join(__dirname, '..')
       });
       
       buildProcess.on('close', (code) => {

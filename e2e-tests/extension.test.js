@@ -2,6 +2,8 @@
  * Basic browser automation test for Chrome extension
  */
 
+const { test, expect } = require('@playwright/test');
+
 test.describe('Chrome Extension Browser Tests', () => {
   test('should load extension in browser', async({ page }) => {
     // Navigate to a test page

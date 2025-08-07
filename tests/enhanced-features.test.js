@@ -300,12 +300,14 @@ describe('Enhanced Anti-Adblock and Restricted Content Features', () => {
         } else if (i % 15 === 0) {
           // Create iframe elements that would be checked for blocked hosts
           const iframe = document.createElement('iframe');
-          iframe.src = 'https://doubleclick.net/ad';
+          iframe.src = 'data:text/html,<div>blocked-ad</div>'; // Use data URL to avoid HTTP requests
+          iframe.setAttribute('data-blocked-host', 'doubleclick.net');
           element.appendChild(iframe);
         } else if (i % 10 === 0) {
-          // Add script elements with src attributes
+          // Add script elements with data src attributes to avoid HTTP requests
           const script = document.createElement('script');
-          script.src = 'https://googlesyndication.com/ad.js';
+          script.setAttribute('data-src', 'googlesyndication.com/ad.js');
+          script.setAttribute('data-blocked', 'true');
           element.appendChild(script);
         } else {
           element.className = 'regular-content';
